@@ -7,6 +7,10 @@
 **Вырезает паузы из видео.**
 Окно для [auto-editor](https://github.com/WyattBlue/auto-editor) — без терминала, без Python, без интернета.
 
+[![Release](https://img.shields.io/github/v/release/EmptyOverlord/hush?style=flat-square&color=7A5CFF)](../../releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/EmptyOverlord/hush/total?style=flat-square&color=7A5CFF)](../../releases/latest)
+[![License](https://img.shields.io/badge/license-MIT-7A5CFF?style=flat-square)](LICENSE)
+
 [Скачать](../../releases/latest) · [English](README.md)
 
 </div>
