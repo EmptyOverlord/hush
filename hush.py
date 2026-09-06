@@ -446,13 +446,26 @@ class Tabs(tk.Frame):
         self.pages = {}
 
         bar = tk.Frame(self, bg=T.panel)
-        bar.pack(fill="x", pady=(0, 10))
+        bar.pack(fill="x")
+        self.marks = {}
         for key, label in names:
-            h = tk.Label(bar, text=label, bg=T.panel, fg=T.dim,
-                         font=T.font(12), padx=2, pady=5, cursor="hand2")
-            h.pack(side="left", padx=(0, 18))
-            h.bind("<Button-1>", lambda _e, k=key: self.show(k))
-            self.heads[key] = h
+            cell = tk.Frame(bar, bg=T.panel, cursor="hand2")
+            cell.pack(side="left", padx=(0, 6))
+            lab = tk.Label(cell, text=label, bg=T.panel, fg=T.dim,
+                           font=T.font(14, True), padx=14, pady=8,
+                           cursor="hand2")
+            lab.pack()
+            mark = tk.Frame(cell, bg=T.panel, height=3)   # подчёркивание
+            mark.pack(fill="x")
+            for w in (cell, lab):
+                w.bind("<Button-1>", lambda _e, k=key: self.show(k))
+                w.bind("<Enter>", lambda _e, k=key: self._hover(k, True))
+                w.bind("<Leave>", lambda _e, k=key: self._hover(k, False))
+            self.heads[key] = lab
+            self.marks[key] = mark
+
+        # линия под всей полосой — видно, что это переключатель
+        tk.Frame(self, bg=T.line, height=1).pack(fill="x", pady=(0, 12))
 
         self.body = tk.Frame(self, bg=T.panel)
         self.body.pack(fill="both", expand=True)
@@ -460,13 +473,20 @@ class Tabs(tk.Frame):
             self.pages[key] = tk.Frame(self.body, bg=T.panel)
         self._paint()
 
+    def _hover(self, key, on):
+        if key != self.value:
+            self.heads[key].config(fg=T.text if on else T.dim)
+
     def page(self, key):
         return self.pages[key]
 
     def _paint(self):
         for key, h in self.heads.items():
             on = key == self.value
-            h.config(fg=T.text if on else T.faint, font=T.font(12, on))
+            h.config(fg=T.text if on else T.dim, font=T.font(14, True),
+                     bg=T.panel2 if on else T.panel)
+            h.master.config(bg=T.panel2 if on else T.panel)
+            self.marks[key].config(bg=T.accent if on else T.panel)
         for key, pg in self.pages.items():
             pg.pack_forget()
         self.pages[self.value].pack(fill="both", expand=True)
