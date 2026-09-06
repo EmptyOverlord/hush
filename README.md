@@ -15,9 +15,7 @@ A desktop window for [auto-editor](https://github.com/WyattBlue/auto-editor) —
 
 </div>
 
-<img src="docs/screenshot.png" alt="The Hush window">
-
-<sub>Shown in Russian — the 🌐 button switches the whole interface to English.</sub>
+<img src="docs/screenshot-en.png" alt="The Hush window">
 
 ---
 

@@ -15,7 +15,7 @@
 
 </div>
 
-<img src="docs/screenshot.png" alt="Окно Hush">
+<img src="docs/screenshot-ru.png" alt="Окно Hush">
 
 ---
 
