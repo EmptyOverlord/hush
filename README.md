@@ -72,9 +72,10 @@ uploaded, and it works with the network off once the model is downloaded.
 - **One word per line** — the bouncing-word captions Shorts are made of
 - **Translate into English** while transcribing, so a Russian recording gives
   English subtitles in one pass
-- Pick your model: `tiny` (74 MB) through `medium` (1.5 GB). Bigger is more
-  accurate and slower — `base` is a decent start, `small` is noticeably better
-  for languages other than English
+- Eight models to pick from, `tiny` (74 MB) up to `large-v3` (2.9 GB).
+  The quantised ones give you a big model at a fraction of the weight —
+  **turbo-q5 (547 MB)** is the sweet spot: large-v3 quality for the size of
+  `small`. For anything other than English, start there.
 
 Downloaded once, the model is kept in your user folder and reused.
 

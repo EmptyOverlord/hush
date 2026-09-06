@@ -63,7 +63,7 @@ STRINGS = {
         "motion_hint": "меньше — замечает мелкие шевеления",
         "tab_subs": "Субтитры",
         "model": "Модель распознавания",
-        "model_hint": "больше модель — точнее текст, но дольше и тяжелее",
+        "model_hint": "больше — точнее, но дольше и тяжелее. Для русского бери turbo-q5 или выше",
         "model_missing": "не скачана",
         "model_ready": "готова",
         "dl_model": "Скачать модель",
@@ -80,7 +80,7 @@ STRINGS = {
         "head_subs": "── Распознаю речь ──",
         "subs_need_model": "Сначала скачай модель на вкладке «Субтитры».",
         "subs_done": "     готово → {name}",
-        "subs_dl": "  Качаю модель {m} ({mb} МБ). Один раз, потом лежит на диске.",
+        "subs_dl": "  Качаю модель {m}, {mb}. Один раз, потом лежит на диске.",
         "subs_dl_ok": "  Модель готова.",
         "subs_slow": "  Распознавание идёт примерно со скоростью видео. Наберись терпения.",
         "tab_cut": "Резка",
@@ -204,7 +204,7 @@ STRINGS = {
         "motion_hint": "lower notices smaller movement",
         "tab_subs": "Subtitles",
         "model": "Recognition model",
-        "model_hint": "a bigger model is more accurate, but slower and heavier",
+        "model_hint": "bigger is more accurate but slower and heavier. For non-English, turbo-q5 and up",
         "model_missing": "not downloaded",
         "model_ready": "ready",
         "dl_model": "Download model",
@@ -221,7 +221,7 @@ STRINGS = {
         "head_subs": "── Transcribing ──",
         "subs_need_model": "Download a model on the Subtitles tab first.",
         "subs_done": "     done → {name}",
-        "subs_dl": "  Downloading the {m} model ({mb} MB). Once, then it stays on disk.",
+        "subs_dl": "  Downloading the {m} model, {mb}. Once, then it stays on disk.",
         "subs_dl_ok": "  Model ready.",
         "subs_slow": "  Transcribing runs at roughly video speed. Be patient.",
         "tab_cut": "Cutting",
@@ -697,9 +697,25 @@ EXPORT_INFO = {
     "kdenlive":      ("Kdenlive",         ".kdenlive"),
 }
 
-MODELS = {                       # имя: размер в МБ
-    "tiny": 74, "base": 141, "small": 465, "medium": 1462,
+# имя файла на HuggingFace: (размер в МБ, короткая подпись на кнопке)
+MODELS = {
+    "tiny":                (74,   "tiny"),
+    "base":                (141,  "base"),
+    "small-q5_1":          (181,  "small-q5"),
+    "small":               (465,  "small"),
+    "medium-q5_0":         (514,  "medium-q5"),
+    "large-v3-turbo-q5_0": (547,  "turbo-q5"),
+    "large-v3-turbo":      (1549, "turbo"),
+    "large-v3":            (2951, "large-v3"),
 }
+
+
+def model_size(name):
+    """74 МБ / 2.9 ГБ"""
+    mb = MODELS[name][0]
+    if mb < 1024:
+        return f"{mb} " + ("МБ" if LANG == "ru" else "MB")
+    return f"{mb / 1024:.1f} " + ("ГБ" if LANG == "ru" else "GB")
 MODEL_URL = ("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/"
              "ggml-{}.bin")
 
@@ -1278,8 +1294,7 @@ class App:
         tk.Label(subs, text=L("model_hint"), bg=T.panel, fg=T.faint,
                  font=T.font(10), anchor="w").pack(fill="x", pady=(0, 4))
         self.seg_model = Seg(
-            subs, [(m, f"{m}  {MODELS[m]} МБ" if LANG == "ru"
-                    else f"{m}  {MODELS[m]} MB") for m in MODELS],
+            subs, [(m, f"{MODELS[m][1]}  ·  {model_size(m)}") for m in MODELS],
             self.s["model"], self.on_model, columns=2)
         self.seg_model.pack(fill="x", pady=(0, 4))
 
@@ -1734,7 +1749,7 @@ class App:
     def work_model(self):
         name = self.s["model"]
         self.say("", "dim")
-        self.say(L("subs_dl", m=name, mb=MODELS[name]), "acc")
+        self.say(L("subs_dl", m=name, mb=model_size(name)), "acc")
         try:
             download_model(
                 name,
