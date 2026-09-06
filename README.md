@@ -127,6 +127,26 @@ binaries on Windows. CI does all four platforms on every tag; see
 The icon is drawn by code, no image editor and no libraries — see
 [`make_icon.py`](make_icon.py).
 
+## Releasing
+
+```bash
+./release.sh
+```
+
+That's the whole thing. It bumps the patch version, syncs the version inside
+the app bundle, tags, pushes, and CI builds all four platforms and attaches
+them to the release.
+
+| Command | Result |
+|---|---|
+| `./release.sh` | 1.0.0 → 1.0.1 |
+| `./release.sh minor` | 1.0.1 → 1.1.0 |
+| `./release.sh major` | 1.1.0 → 2.0.0 |
+| `./release.sh 1.4.2` | that exact version |
+| `./release.sh -n` | dry run — prints what it would do, changes nothing |
+
+On a Mac you can also just double-click **Выпустить релиз.command** in Finder.
+
 ## Built with
 
 - [auto-editor](https://github.com/WyattBlue/auto-editor) by WyattBlue — the engine that does the actual work. Public domain (Unlicense).
