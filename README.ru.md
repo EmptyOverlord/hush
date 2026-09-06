@@ -15,6 +15,8 @@
 
 </div>
 
+<img src="docs/screenshot.png" alt="Окно Hush">
+
 ---
 
 ## Что это
