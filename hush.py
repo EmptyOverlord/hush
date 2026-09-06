@@ -63,7 +63,7 @@ STRINGS = {
         "motion_hint": "меньше — замечает мелкие шевеления",
         "tab_subs": "Субтитры",
         "model": "Модель распознавания",
-        "model_hint": "больше — точнее, но дольше и тяжелее. Для русского бери turbo-q5 или выше",
+        "model_hint": "для русского бери от turbo-q5",
         "model_missing": "не скачана",
         "model_ready": "готова",
         "dl_model": "Скачать модель",
@@ -79,9 +79,8 @@ STRINGS = {
         "subs_tr": "Перевести на английский",
         "tr_hint": "говоришь по-русски — субтитры выходят английскими",
         "subs_btn": "Сделать субтитры",
-        "subs_note": "Это отдельное действие: субтитры делаются из исходного "
-                     "файла, а не из обработанного. Настрой здесь и нажми "
-                     "«Сделать субтитры» внизу.",
+        "subs_note": "Отдельное действие. Субтитры берутся из исходника, "
+                     "не из обработанного файла.",
         "head_subs": "── Распознаю речь ──",
         "subs_need_model": "Сначала скачай модель на вкладке «Субтитры».",
         "subs_done": "     готово → {name}",
@@ -213,7 +212,7 @@ STRINGS = {
         "motion_hint": "lower notices smaller movement",
         "tab_subs": "Subtitles",
         "model": "Recognition model",
-        "model_hint": "bigger is more accurate but slower and heavier. For non-English, turbo-q5 and up",
+        "model_hint": "for anything but English take turbo-q5 or bigger",
         "model_missing": "not downloaded",
         "model_ready": "ready",
         "dl_model": "Download model",
@@ -229,9 +228,8 @@ STRINGS = {
         "subs_tr": "Translate into English",
         "tr_hint": "speak any language, get English subtitles out",
         "subs_btn": "Make subtitles",
-        "subs_note": "This is a separate job: subtitles come from the source "
-                     "file, not from the cut one. Set it up here, then press "
-                     "Make subtitles below.",
+        "subs_note": "A separate job. Subtitles come from the source, "
+                     "not from the cut file.",
         "head_subs": "── Transcribing ──",
         "subs_need_model": "Download a model on the Subtitles tab first.",
         "subs_done": "     done → {name}",
@@ -492,7 +490,8 @@ class Slider(tk.Canvas):
 class Seg(tk.Frame):
     """Переключатель из нескольких кнопок. Активна одна."""
 
-    def __init__(self, parent, options, value, on_change=None, columns=None):
+    def __init__(self, parent, options, value, on_change=None, columns=None,
+                 pady=7):
         super().__init__(parent, bg=T.panel)
         self.value = value
         self.on_change = on_change
@@ -503,7 +502,8 @@ class Seg(tk.Frame):
         cols = columns or len(options)
         for i, (key, label) in enumerate(options):
             cell = tk.Label(self, text=label, bg=T.panel2, fg=T.dim,
-                            font=T.font(12), padx=12, pady=7, cursor="hand2")
+                            font=T.font(12), padx=12, pady=pady,
+                            cursor="hand2")
             cell.grid(row=i // cols, column=i % cols, sticky="ew",
                       padx=(0, 4), pady=(0, 4))
             cell.bind("<Button-1>", lambda _e, k=key: self.set(k))
@@ -571,8 +571,34 @@ class Tabs(tk.Frame):
         # линия под всей полосой — видно, что это переключатель
         tk.Frame(self, bg=T.line, height=1).pack(fill="x", pady=(0, 12))
 
-        self.body = tk.Frame(self, bg=T.panel)
-        self.body.pack(fill="both", expand=True)
+        # тело вкладок прокручивается — иначе длинная вкладка обрежется
+        wrap = tk.Frame(self, bg=T.panel)
+        wrap.pack(fill="both", expand=True)
+        self.canvas = tk.Canvas(wrap, bg=T.panel, highlightthickness=0)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.rail = tk.Canvas(wrap, bg=T.panel, width=4,
+                              highlightthickness=0)
+        self.rail.pack(side="right", fill="y")
+        self.body = tk.Frame(self.canvas, bg=T.panel)
+        self._win = self.canvas.create_window((0, 0), window=self.body,
+                                              anchor="nw")
+
+        def fit(_=None):
+            self.canvas.itemconfig(self._win, width=self.canvas.winfo_width())
+            self.canvas.config(scrollregion=self.canvas.bbox("all"))
+            self._rail()
+        self.canvas.bind("<Configure>", fit)
+        self.body.bind("<Configure>", fit)
+        self.canvas.config(yscrollcommand=lambda *_a: self._rail())
+
+        def wheel(e):
+            if self.body.winfo_reqheight() > self.canvas.winfo_height():
+                self.canvas.yview_scroll(-1 if e.delta > 0 else 1, "units")
+        self.canvas.bind("<Enter>",
+                         lambda _e: self.canvas.bind_all("<MouseWheel>", wheel))
+        self.canvas.bind("<Leave>",
+                         lambda _e: self.canvas.unbind_all("<MouseWheel>"))
+
         for key, _ in names:
             self.pages[key] = tk.Frame(self.body, bg=T.panel)
         self._paint()
@@ -580,6 +606,18 @@ class Tabs(tk.Frame):
     def _hover(self, key, on):
         if key != self.value:
             self.heads[key].config(fg=T.text if on else T.dim)
+
+    def _rail(self):
+        """Полоска справа — только когда содержимое длиннее окна."""
+        self.rail.delete("all")
+        h = self.canvas.winfo_height()
+        full = self.body.winfo_reqheight()
+        if full <= h or h < 10:
+            return
+        top, bot = self.canvas.yview()
+        self.rail.create_rectangle(1, 0, 4, h, fill=T.panel2, outline="")
+        self.rail.create_rectangle(1, top * h, 4, bot * h,
+                                   fill=T.line, outline="")
 
     def page(self, key):
         return self.pages[key]
@@ -598,6 +636,8 @@ class Tabs(tk.Frame):
     def show(self, key):
         self.value = key
         self._paint()
+        self.canvas.yview_moveto(0)
+        self.after(30, self._rail)
         if self.on_change:
             self.on_change(key)
 
@@ -712,6 +752,17 @@ class Fish(tk.Canvas):
         self.t += 0.14
         self.coords(self.item, self.x, self.H / 2 + math.sin(self.t) * 2.5)
         self.after(45, self.swim)
+
+
+def hint(parent, text, bg=None, fg=None):
+    """Мелкая подпись. Перенос строк подстраивается под ширину панели."""
+    bg = bg or T.panel
+    lab = tk.Label(parent, text=text, bg=bg, fg=fg or T.faint,
+                   font=T.font(10), anchor="w", justify="left")
+    lab.bind("<Configure>",
+             lambda e, w=lab: w.winfo_width() > 20
+             and w.config(wraplength=w.winfo_width() - 4))
+    return lab
 
 
 def card(parent, title=None):
@@ -1245,8 +1296,7 @@ class App:
         box = cut          # дальше всё кладём на вкладку «Резка»
         tk.Label(box, text=L("margin"), bg=T.panel, fg=T.text,
                  font=T.font(12), anchor="w").pack(fill="x")
-        tk.Label(box, text=L("margin_hint"), bg=T.panel, fg=T.faint,
-                 font=T.font(10), anchor="w").pack(fill="x")
+        hint(box, L("margin_hint")).pack(fill="x")
         self.sl_margin = Slider(
             box, 0.0, 1.0, self.s["margin"], 0.05,
             lambda v: f"{v:.2f} {L('unit_sec')}", self.on_margin)
@@ -1254,8 +1304,7 @@ class App:
 
         tk.Label(box, text=L("thresh"), bg=T.panel, fg=T.text,
                  font=T.font(12), anchor="w").pack(fill="x")
-        tk.Label(box, text=L("thresh_hint"), bg=T.panel, fg=T.faint,
-                 font=T.font(10), anchor="w").pack(fill="x")
+        hint(box, L("thresh_hint")).pack(fill="x")
         self.sl_db = Slider(box, -50, -10, self.s["db"], 1,
                             lambda v: f"{int(v)} dB", self.on_db)
         self.sl_db.pack(fill="x", pady=(2, 12))
@@ -1278,7 +1327,10 @@ class App:
         self.seg_detect.pack(fill="x", pady=(0, 2))
         self.lbl_detect = tk.Label(
             box, text="", bg=T.panel, fg=T.dim, font=T.font(10),
-            anchor="nw", justify="left", wraplength=330, height=2)
+            anchor="nw", justify="left", height=2)
+        self.lbl_detect.bind("<Configure>",
+                         lambda e, w=self.lbl_detect: w.winfo_width() > 20
+                         and w.config(wraplength=w.winfo_width() - 4))
         self.lbl_detect.pack(fill="x", pady=(0, 8))
 
         self.sl_motion = Slider(box, 0.005, 0.100, self.s["motion_sens"],
@@ -1288,14 +1340,11 @@ class App:
         self.chk_black = Check(box, L("black"), self.s["black"],
                                self.on_black)
         self.chk_black.pack(fill="x")
-        tk.Label(box, text=L("black_hint"), bg=T.panel, fg=T.faint,
-                 font=T.font(10), anchor="w", justify="left",
-                 wraplength=330).pack(fill="x", pady=(0, 10))
+        hint(box, L("black_hint")).pack(fill="x", pady=(0, 10))
 
         tk.Label(box, text=L("smooth"), bg=T.panel, fg=T.text,
                  font=T.font(12), anchor="w").pack(fill="x")
-        tk.Label(box, text=L("smooth_hint"), bg=T.panel, fg=T.faint,
-                 font=T.font(10), anchor="w").pack(fill="x")
+        hint(box, L("smooth_hint")).pack(fill="x")
         self.sl_smooth = Slider(
             box, 0.0, 0.60, self.s["smooth"], 0.05,
             lambda v: L("smooth_off") if v <= 0 else f"{v:.2f} {L('unit_sec')}",
@@ -1304,8 +1353,7 @@ class App:
 
         tk.Label(box, text=L("speed"), bg=T.panel, fg=T.text,
                  font=T.font(12), anchor="w").pack(fill="x")
-        tk.Label(box, text=L("speed_hint"), bg=T.panel, fg=T.faint,
-                 font=T.font(10), anchor="w").pack(fill="x")
+        hint(box, L("speed_hint")).pack(fill="x")
         self.sl_speed = Slider(
             box, 1.0, 2.0, self.s["speed"], 0.05,
             lambda v: L("speed_normal") if v <= 1.001 else f"×{v:.2f}",
@@ -1322,15 +1370,16 @@ class App:
         self.seg_export.pack(fill="x", pady=(0, 4))
         self.lbl_export = tk.Label(
             out, text="", bg=T.panel, fg=T.dim, font=T.font(10),
-            anchor="nw", justify="left", wraplength=330, height=2)
+            anchor="nw", justify="left", height=2)
+        self.lbl_export.bind("<Configure>",
+                         lambda e, w=self.lbl_export: w.winfo_width() > 20
+                         and w.config(wraplength=w.winfo_width() - 4))
         self.lbl_export.pack(fill="x", pady=(0, 10))
 
         self.chk_trans = Check(out, L("trans"), self.s["trans"],
                                self.on_trans)
         self.chk_trans.pack(fill="x")
-        tk.Label(out, text=L("trans_hint"), bg=T.panel, fg=T.faint,
-                 font=T.font(10), anchor="w", justify="left",
-                 wraplength=330).pack(fill="x", pady=(0, 2))
+        hint(out, L("trans_hint")).pack(fill="x", pady=(0, 2))
         self.sl_trans = Slider(out, 0.10, 0.50, self.s["trans_len"], 0.05,
                                lambda v: f"{v:.2f} {L('unit_sec')}",
                                self.on_trans_len)
@@ -1339,29 +1388,27 @@ class App:
         self.chk_norm = Check(out, L("norm"), self.s["normalize"],
                               self.on_norm)
         self.chk_norm.pack(fill="x")
-        tk.Label(out, text=L("norm_hint"), bg=T.panel, fg=T.faint,
-                 font=T.font(10), anchor="w", justify="left",
-                 wraplength=330).pack(fill="x", pady=(0, 4))
+        hint(out, L("norm_hint")).pack(fill="x", pady=(0, 4))
 
         # ── вкладка «Субтитры»
-        note = tk.Frame(subs, bg=T.panel2, padx=12, pady=10,
-                        highlightthickness=1, highlightbackground=T.line)
-        note.pack(fill="x", pady=(0, 12))
-        tk.Label(note, text=L("subs_note"), bg=T.panel2, fg=T.dim,
-                 font=T.font(11), anchor="w", justify="left",
-                 wraplength=310).pack(fill="x")
+        note = tk.Frame(subs, bg=T.panel2, padx=10, pady=7)
+        note.pack(fill="x", pady=(0, 8))
+        nl = tk.Label(note, text=L("subs_note"), bg=T.panel2, fg=T.dim,
+                      font=T.font(11), anchor="w", justify="left")
+        nl.bind("<Configure>", lambda e, w=nl: w.winfo_width() > 20
+                and w.config(wraplength=w.winfo_width() - 4))
+        nl.pack(fill="x")
 
         tk.Label(subs, text=L("model"), bg=T.panel, fg=T.text,
                  font=T.font(12), anchor="w").pack(fill="x")
-        tk.Label(subs, text=L("model_hint"), bg=T.panel, fg=T.faint,
-                 font=T.font(10), anchor="w").pack(fill="x", pady=(0, 4))
+        hint(subs, L("model_hint")).pack(fill="x", pady=(0, 4))
         self.seg_model = Seg(
             subs, [(m, f"{MODELS[m][1]}  ·  {model_size(m)}") for m in MODELS],
-            self.s["model"], self.on_model, columns=2)
+            self.s["model"], self.on_model, columns=2, pady=5)
         self.seg_model.pack(fill="x", pady=(0, 4))
 
         row = tk.Frame(subs, bg=T.panel)
-        row.pack(fill="x", pady=(0, 12))
+        row.pack(fill="x", pady=(0, 10))
         self.lbl_model = tk.Label(row, text="", bg=T.panel, fg=T.dim,
                                   font=T.font(11), anchor="w")
         self.lbl_model.pack(side="left")
@@ -1375,27 +1422,23 @@ class App:
             subs, [("auto", L("lang_auto")), ("ru", L("lang_ru")),
                    ("en", L("lang_en"))],
             self.s["subs_lang"], self.on_slang)
-        self.seg_slang.pack(fill="x", pady=(0, 12))
+        self.seg_slang.pack(fill="x", pady=(0, 10))
 
         tk.Label(subs, text=L("subs_fmt"), bg=T.panel, fg=T.text,
                  font=T.font(12), anchor="w").pack(fill="x", pady=(0, 4))
         self.seg_sfmt = Seg(
             subs, [("srt", L("fmt_srt")), ("text", L("fmt_text"))],
             self.s["subs_fmt"], self.on_sfmt)
-        self.seg_sfmt.pack(fill="x", pady=(0, 12))
+        self.seg_sfmt.pack(fill="x", pady=(0, 10))
 
         self.chk_words = Check(subs, L("subs_words"), self.s["subs_words"],
                                self.on_words)
         self.chk_words.pack(fill="x")
-        tk.Label(subs, text=L("words_hint"), bg=T.panel, fg=T.faint,
-                 font=T.font(10), anchor="w", justify="left",
-                 wraplength=330).pack(fill="x", pady=(0, 8))
+        hint(subs, L("words_hint")).pack(fill="x", pady=(0, 8))
         self.chk_tr = Check(subs, L("subs_tr"), self.s["subs_tr"],
                             self.on_tr)
         self.chk_tr.pack(fill="x")
-        tk.Label(subs, text=L("tr_hint"), bg=T.panel, fg=T.faint,
-                 font=T.font(10), anchor="w", justify="left",
-                 wraplength=330).pack(fill="x")
+        hint(subs, L("tr_hint")).pack(fill="x")
 
     def build_actions(self, parent):
         wrap = tk.Frame(parent, bg=T.bg, padx=24, pady=10)
