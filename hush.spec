@@ -53,7 +53,7 @@ if mac:
         info_plist={
             "CFBundleName": "Hush",
             "CFBundleDisplayName": "Hush",
-            "CFBundleShortVersionString": "1.0.0",
+            "CFBundleShortVersionString": "1.1.0",
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "11.0",
             "CFBundleDocumentTypes": [{
