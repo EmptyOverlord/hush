@@ -1,3 +1,5 @@
-# движок вшит в bin/ — ставить auto-editor не нужно
-tkinterdnd2        # перетаскивание файлов в окно
-pyinstaller        # только для сборки приложения
+# The auto-editor engine is not a pip package here — it is a native binary
+# fetched by fetch_engines.py and bundled into the build.
+
+tkinterdnd2        # drag and drop into the window
+pyinstaller        # only needed to build a standalone app
