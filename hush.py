@@ -79,6 +79,9 @@ STRINGS = {
         "subs_tr": "Перевести на английский",
         "tr_hint": "говоришь по-русски — субтитры выходят английскими",
         "subs_btn": "Сделать субтитры",
+        "subs_note": "Это отдельное действие: субтитры делаются из исходного "
+                     "файла, а не из обработанного. Настрой здесь и нажми "
+                     "«Сделать субтитры» внизу.",
         "head_subs": "── Распознаю речь ──",
         "subs_need_model": "Сначала скачай модель на вкладке «Субтитры».",
         "subs_done": "     готово → {name}",
@@ -226,6 +229,9 @@ STRINGS = {
         "subs_tr": "Translate into English",
         "tr_hint": "speak any language, get English subtitles out",
         "subs_btn": "Make subtitles",
+        "subs_note": "This is a separate job: subtitles come from the source "
+                     "file, not from the cut one. Set it up here, then press "
+                     "Make subtitles below.",
         "head_subs": "── Transcribing ──",
         "subs_need_model": "Download a model on the Subtitles tab first.",
         "subs_done": "     done → {name}",
@@ -423,6 +429,15 @@ class Btn(tk.Frame):
     def enable(self, on=True):
         self._enabled = on
         self.config(cursor="hand2" if on else "arrow")
+        self._paint(False)
+
+    def set_kind(self, kind):
+        """Сделать кнопку главной или обычной."""
+        if kind == self.kind:
+            return
+        self.kind = kind
+        self.config(highlightthickness=0 if kind == "primary" else 1)
+        self.label.config(font=T.font(13, kind == "primary"))
         self._paint(False)
 
 
@@ -1170,6 +1185,12 @@ class App:
         self.refresh_labels()
         self.setup_dnd()
 
+    def on_tab(self, key):
+        """На вкладке субтитров главной становится своя кнопка."""
+        subs = key == "subs"
+        self.btn_subs.set_kind("primary" if subs else "ghost")
+        self.btn_run.set_kind("ghost" if subs else "primary")
+
     def lang_label(self):
         return "🌐  " + ("RU" if LANG == "ru" else "EN")
 
@@ -1208,7 +1229,8 @@ class App:
         Btn(head, L("defaults"), self.reset_all, pad=(10, 3)).pack()
 
         self.tabs = Tabs(box, [("cut", L("tab_cut")), ("fine", L("tab_fine")),
-                               ("out", L("tab_out")), ("subs", L("tab_subs"))])
+                               ("out", L("tab_out")), ("subs", L("tab_subs"))],
+                         self.on_tab)
         self.tabs.pack(fill="both", expand=True)
         cut = self.tabs.page("cut")
         fine = self.tabs.page("fine")
@@ -1322,6 +1344,13 @@ class App:
                  wraplength=330).pack(fill="x", pady=(0, 4))
 
         # ── вкладка «Субтитры»
+        note = tk.Frame(subs, bg=T.panel2, padx=12, pady=10,
+                        highlightthickness=1, highlightbackground=T.line)
+        note.pack(fill="x", pady=(0, 12))
+        tk.Label(note, text=L("subs_note"), bg=T.panel2, fg=T.dim,
+                 font=T.font(11), anchor="w", justify="left",
+                 wraplength=310).pack(fill="x")
+
         tk.Label(subs, text=L("model"), bg=T.panel, fg=T.text,
                  font=T.font(12), anchor="w").pack(fill="x")
         tk.Label(subs, text=L("model_hint"), bg=T.panel, fg=T.faint,
