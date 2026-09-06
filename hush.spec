@@ -13,7 +13,7 @@ if mac:
     engines = [("bin/auto-editor-macos-arm64", "bin"),
                ("bin/auto-editor-macos-x86_64", "bin")]
 elif win:
-    engines = [("bin/auto-editor-windows-amd64.exe", "bin")]
+    engines = [("bin/auto-editor-windows-x86_64.exe", "bin")]
 else:
     engines = [("bin/auto-editor-linux-x86_64", "bin")]
 

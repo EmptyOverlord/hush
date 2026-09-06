@@ -53,6 +53,20 @@ STRINGS = {
         "drop_hint": "Перетащи сюда файлы или нажми «Добавить файлы»",
         "no_dnd": "Нажми «Добавить файлы» — перетаскивание недоступно",
 
+        "tab_cut": "Резка",
+        "tab_out": "Вывод",
+        "detect": "По чему резать",
+        "det_audio": "По звуку",
+        "det_both": "Звук и движение",
+        "det_motion": "По движению",
+        "det_hint_audio": "оставляем там, где говорят",
+        "det_hint_both": "оставляем, где говорят или что-то движется — для записей экрана",
+        "det_hint_motion": "оставляем, где картинка меняется; звук не учитывается",
+        "black": "Убирать чёрные кадры",
+        "trans": "Плавные переходы",
+        "trans_hint": "растворение на месте резов вместо жёсткой склейки",
+        "trans_len": "Длина перехода",
+        "trans_fail": "     Переход длиннее, чем куски между резами. Уменьши длину перехода.",
         "soft": "Мягко",
         "normal": "Обычно",
         "tight": "Плотно",
@@ -149,6 +163,20 @@ STRINGS = {
         "drop_hint": "Drop files here, or click “Add files”",
         "no_dnd": "Click “Add files” — drag and drop is unavailable",
 
+        "tab_cut": "Cutting",
+        "tab_out": "Output",
+        "detect": "What counts as content",
+        "det_audio": "Sound",
+        "det_both": "Sound or motion",
+        "det_motion": "Motion",
+        "det_hint_audio": "keep the parts where someone is talking",
+        "det_hint_both": "keep talking or moving picture — good for screen recordings",
+        "det_hint_motion": "keep where the picture changes; audio is ignored",
+        "black": "Drop black frames",
+        "trans": "Smooth transitions",
+        "trans_hint": "dissolve across each cut instead of a hard join",
+        "trans_len": "Transition length",
+        "trans_fail": "     The transition is longer than the clips between cuts. Shorten it.",
         "soft": "Soft",
         "normal": "Normal",
         "tight": "Tight",
@@ -407,6 +435,49 @@ class Seg(tk.Frame):
             self.on_change(key)
 
 
+class Tabs(tk.Frame):
+    """Полоска вкладок. Показывает одну страницу из нескольких."""
+
+    def __init__(self, parent, names, on_change=None):
+        super().__init__(parent, bg=T.panel)
+        self.on_change = on_change
+        self.value = names[0][0]
+        self.heads = {}
+        self.pages = {}
+
+        bar = tk.Frame(self, bg=T.panel)
+        bar.pack(fill="x", pady=(0, 10))
+        for key, label in names:
+            h = tk.Label(bar, text=label, bg=T.panel, fg=T.dim,
+                         font=T.font(12), padx=2, pady=5, cursor="hand2")
+            h.pack(side="left", padx=(0, 18))
+            h.bind("<Button-1>", lambda _e, k=key: self.show(k))
+            self.heads[key] = h
+
+        self.body = tk.Frame(self, bg=T.panel)
+        self.body.pack(fill="both", expand=True)
+        for key, _ in names:
+            self.pages[key] = tk.Frame(self.body, bg=T.panel)
+        self._paint()
+
+    def page(self, key):
+        return self.pages[key]
+
+    def _paint(self):
+        for key, h in self.heads.items():
+            on = key == self.value
+            h.config(fg=T.text if on else T.faint, font=T.font(12, on))
+        for key, pg in self.pages.items():
+            pg.pack_forget()
+        self.pages[self.value].pack(fill="both", expand=True)
+
+    def show(self, key):
+        self.value = key
+        self._paint()
+        if self.on_change:
+            self.on_change(key)
+
+
 class Check(tk.Frame):
     """Галочка."""
 
@@ -552,6 +623,10 @@ PRESETS = {
 
 DEFAULTS = {
     "lang": "ru",
+    "detect": "audio",
+    "black": False,
+    "trans": False,
+    "trans_len": 0.25,
     "preset": "normal",
     "margin": 0.30,
     "db": -30,
@@ -599,21 +674,34 @@ def no_window():
     return {}
 
 
-def binary_name():
-    """Имя бинарника под текущую систему."""
-    m = platform.machine().lower()
+def binary_names():
+    """Имена бинарника под эту систему, свежее имя первым.
+
+    В 31.x файлы переименовали: windows-amd64 -> windows-x86_64.
+    Держим оба, чтобы работать и со старым движком, и с новым."""
+    arm = platform.machine().lower() in ("arm64", "aarch64")
     if IS_WIN:
-        return "auto-editor-windows-amd64.exe"
+        return (["auto-editor-windows-aarch64.exe"] if arm
+                else ["auto-editor-windows-x86_64.exe",
+                      "auto-editor-windows-amd64.exe"])
     if IS_MAC:
-        return ("auto-editor-macos-arm64" if m in ("arm64", "aarch64")
-                else "auto-editor-macos-x86_64")
-    return "auto-editor-linux-x86_64"
+        return ["auto-editor-macos-arm64"] if arm \
+            else ["auto-editor-macos-x86_64"]
+    return (["auto-editor-linux-aarch64"] if arm
+            else ["auto-editor-linux-x86_64"])
+
+
+def binary_name():
+    """Основное имя — им подписываем сообщения об ошибке."""
+    return binary_names()[0]
 
 
 def find_auto_editor():
     """Ищем бинарник: обновлённый → вшитый в приложение → системный."""
-    name = binary_name()
-    for folder in (update_dir(), os.path.join(resource_dir(), "bin")):
+    for folder, name in ((f, n)
+                         for f in (update_dir(),
+                                   os.path.join(resource_dir(), "bin"))
+                         for n in binary_names()):
         path = os.path.join(folder, name)
         if os.path.isfile(path):
             if not IS_WIN and not os.access(path, os.X_OK):
@@ -624,6 +712,23 @@ def find_auto_editor():
             return [path]
     exe = shutil.which("auto-editor")
     return [exe] if exe else None
+
+
+_TEMP_DIR_OK = {}
+
+
+def supports_temp_dir(cmd):
+    """--temp-dir выпилили в auto-editor 31.1.0. Спрашиваем движок сами."""
+    key = cmd[0]
+    if key not in _TEMP_DIR_OK:
+        try:
+            r = subprocess.run(cmd + ["--help"], capture_output=True,
+                               text=True, timeout=20, encoding="utf-8",
+                               errors="replace", **no_window())
+            _TEMP_DIR_OK[key] = "--temp-dir" in (r.stdout or "") + (r.stderr or "")
+        except Exception:
+            _TEMP_DIR_OK[key] = False
+    return _TEMP_DIR_OK[key]
 
 
 def binary_version(cmd):
@@ -642,7 +747,7 @@ def latest_release():
     try:
         req = urllib.request.Request(
             "https://api.github.com/repos/WyattBlue/auto-editor/releases/latest",
-            headers={"User-Agent": "tishina"})
+            headers={"User-Agent": "hush"})
         with urllib.request.urlopen(req, timeout=12) as r:
             return json.load(r).get("tag_name", "").lstrip("v") or None
     except Exception:
@@ -650,17 +755,28 @@ def latest_release():
 
 
 def download_binary(version, on_progress=None):
-    """Качаем бинарник нужной версии в папку обновлений."""
+    """Качаем бинарник нужной версии. Имена файлов менялись — пробуем все."""
     import urllib.request
-    name = binary_name()
-    url = (f"https://github.com/WyattBlue/auto-editor/releases/download/"
-           f"{version}/{name}")
     folder = update_dir()
     os.makedirs(folder, exist_ok=True)
+    base = "https://github.com/WyattBlue/auto-editor/releases/download"
+
+    last = None
+    for name in binary_names():
+        try:
+            req = urllib.request.Request(f"{base}/{version}/{name}",
+                                         headers={"User-Agent": "hush"})
+            urllib.request.urlopen(req, timeout=20).close()
+            break
+        except Exception as e:
+            last = e
+    else:
+        raise last or RuntimeError("no binary for this platform")
+
     tmp = os.path.join(folder, name + ".part")
     dst = os.path.join(folder, name)
-
-    req = urllib.request.Request(url, headers={"User-Agent": "tishina"})
+    req = urllib.request.Request(f"{base}/{version}/{name}",
+                                 headers={"User-Agent": "hush"})
     with urllib.request.urlopen(req, timeout=60) as r, open(tmp, "wb") as f:
         total = int(r.headers.get("Content-Length") or 0)
         done = 0
@@ -688,11 +804,27 @@ def cmp_version(a, b):
     return pa > pb
 
 
+MOTION = "motion:0.02"
+
+
+def edit_expr(s):
+    """Выражение для --edit. Синтаксис у движка лисповый."""
+    audio = f"audio:{int(s['db'])}dB"
+    base = {"audio": audio,
+            "both": f"(or {audio} {MOTION})",
+            "motion": MOTION}[s.get("detect", "audio")]
+    if s.get("black"):
+        base = f"(and {base} (not blackdetect))"
+    return base
+
+
 def build_args(s):
     """Общие флаги из настроек."""
     args = ["--margin", f"{s['margin']}s",
-            "--edit", f"audio:{int(s['db'])}dB",
+            "--edit", edit_expr(s),
             "--no-open"]
+    if s.get("trans"):
+        args += ["--transition", f"dissolve:{s['trans_len']}sec"]
     if s["silent"] != "cut":
         args += ["--when-silent", f"speed:{s['silent']}"]
     if s["normalize"] and s["export"] == "default":
@@ -883,11 +1015,17 @@ class App:
         head.place(relx=1.0, y=-4, anchor="ne")
         Btn(head, L("defaults"), self.reset_all, pad=(10, 3)).pack()
 
+        self.tabs = Tabs(box, [("cut", L("tab_cut")), ("out", L("tab_out"))])
+        self.tabs.pack(fill="both", expand=True)
+        cut = self.tabs.page("cut")
+        out = self.tabs.page("out")
+
         self.seg_preset = Seg(
-            box, [(k, L(k)) for k in ("soft", "normal", "tight")],
+            cut, [(k, L(k)) for k in ("soft", "normal", "tight")],
             self.s["preset"], self.apply_preset)
         self.seg_preset.pack(fill="x", pady=(0, 12))
 
+        box = cut          # дальше всё кладём на вкладку «Резка»
         tk.Label(box, text=L("margin"), bg=T.panel, fg=T.text,
                  font=T.font(12), anchor="w").pack(fill="x")
         tk.Label(box, text=L("margin_hint"), bg=T.panel, fg=T.faint,
@@ -912,19 +1050,48 @@ class App:
             self.s["silent"], self.on_silent)
         self.seg_silent.pack(fill="x", pady=(0, 12))
 
-        tk.Label(box, text=L("output"), bg=T.panel, fg=T.text,
+        # по чему резать
+        tk.Label(box, text=L("detect"), bg=T.panel, fg=T.text,
+                 font=T.font(12), anchor="w").pack(fill="x", pady=(0, 4))
+        self.seg_detect = Seg(
+            box, [("audio", L("det_audio")), ("both", L("det_both")),
+                  ("motion", L("det_motion"))],
+            self.s["detect"], self.on_detect)
+        self.seg_detect.pack(fill="x", pady=(0, 2))
+        self.lbl_detect = tk.Label(
+            box, text="", bg=T.panel, fg=T.dim, font=T.font(10),
+            anchor="nw", justify="left", wraplength=330, height=2)
+        self.lbl_detect.pack(fill="x", pady=(0, 8))
+
+        self.chk_black = Check(box, L("black"), self.s["black"],
+                               self.on_black)
+        self.chk_black.pack(fill="x", pady=(0, 4))
+
+        # ── вкладка «Вывод»
+        tk.Label(out, text=L("output"), bg=T.panel, fg=T.text,
                  font=T.font(12), anchor="w").pack(fill="x", pady=(0, 6))
         self.seg_export = Seg(
-            box, [(k, L("video") if k == "default" else EXPORT_INFO[k][0])
+            out, [(k, L("video") if k == "default" else EXPORT_INFO[k][0])
                   for k in EXPORTS],
             self.s["export"], self.on_export, columns=2)
         self.seg_export.pack(fill="x", pady=(0, 4))
         self.lbl_export = tk.Label(
-            box, text="", bg=T.panel, fg=T.dim, font=T.font(10),
+            out, text="", bg=T.panel, fg=T.dim, font=T.font(10),
             anchor="nw", justify="left", wraplength=330, height=2)
         self.lbl_export.pack(fill="x", pady=(0, 10))
 
-        self.chk_norm = Check(box, L("norm"), self.s["normalize"],
+        self.chk_trans = Check(out, L("trans"), self.s["trans"],
+                               self.on_trans)
+        self.chk_trans.pack(fill="x")
+        tk.Label(out, text=L("trans_hint"), bg=T.panel, fg=T.faint,
+                 font=T.font(10), anchor="w", justify="left",
+                 wraplength=330).pack(fill="x", pady=(0, 2))
+        self.sl_trans = Slider(out, 0.10, 0.50, self.s["trans_len"], 0.05,
+                               lambda v: f"{v:.2f} {L('unit_sec')}",
+                               self.on_trans_len)
+        self.sl_trans.pack(fill="x", pady=(0, 10))
+
+        self.chk_norm = Check(out, L("norm"), self.s["normalize"],
                               self.on_norm)
         self.chk_norm.pack(fill="x", pady=(0, 4))
 
@@ -1041,6 +1208,7 @@ class App:
 
         video = self.s["export"] == "default"
         self.chk_norm.enable(video, L("norm") if video else L("norm_off"))
+        self.lbl_detect.config(text=L("det_hint_" + self.s["detect"]))
 
     def apply_preset(self, key):
         if not key:
@@ -1073,6 +1241,23 @@ class App:
         self.refresh_labels()
         self.save_settings()
 
+    def on_detect(self, key):
+        self.s["detect"] = key
+        self.refresh_labels()
+        self.save_settings()
+
+    def on_black(self, v):
+        self.s["black"] = v
+        self.save_settings()
+
+    def on_trans(self, v):
+        self.s["trans"] = v
+        self.save_settings()
+
+    def on_trans_len(self, v):
+        self.s["trans_len"] = v
+        self.save_settings()
+
     def on_norm(self, v):
         self.s["normalize"] = v
         self.refresh_labels()
@@ -1087,6 +1272,10 @@ class App:
         self.seg_preset.set(self.s["preset"])
         self.seg_silent.set(self.s["silent"])
         self.seg_export.set(self.s["export"])
+        self.seg_detect.set(self.s["detect"])
+        self.chk_black.set(self.s["black"])
+        self.chk_trans.set(self.s["trans"])
+        self.sl_trans.set(self.s["trans_len"])
         self.chk_norm.set(self.s["normalize"])
         self.refresh_labels()
         self.save_settings()
@@ -1325,11 +1514,13 @@ class App:
             dst = out_path(src, self.s)
             self.say(f"  {name}", "txt")
 
-            tmp = tempfile.mkdtemp(prefix="hush-")
+            tmp = (tempfile.mkdtemp(prefix="hush-")
+                   if supports_temp_dir(self.bin) else None)
             cmd = (self.bin + [src] + build_args(self.s)
                    + ["--export", self.s["export"], "-o", dst,
-                      "--temp-dir", os.path.join(tmp, "work"),
                       "--progress", "machine"])
+            if tmp:
+                cmd += ["--temp-dir", os.path.join(tmp, "work")]
             try:
                 self.proc = subprocess.Popen(
                     cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -1367,7 +1558,8 @@ class App:
                     tail = tail[-6:]
 
             code = self.proc.wait()
-            shutil.rmtree(tmp, ignore_errors=True)
+            if tmp:
+                shutil.rmtree(tmp, ignore_errors=True)
             if self.stop_flag:
                 break
             if code == 0 and os.path.exists(dst):
@@ -1379,9 +1571,13 @@ class App:
                 ok_files.append(dst)
             else:
                 self.say(L("fail_file", code=code), "bad")
-                for t in tail:
-                    if "rror" in t:
-                        self.say(f"     {t}", "bad")
+                joined = " ".join(tail)
+                if "Transitions must have" in joined:
+                    self.say(L("trans_fail"), "bad")
+                else:
+                    for t in tail:
+                        if "rror" in t:
+                            self.say(f"     {t}", "bad")
 
         if ok_files:
             self.say(L("done_all", ok=len(ok_files), total=total), "acc")

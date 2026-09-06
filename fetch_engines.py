@@ -15,14 +15,14 @@ import platform
 import sys
 import urllib.request
 
-VERSION = "29.3.1"
+VERSION = "31.5.0"
 BASE = ("https://github.com/WyattBlue/auto-editor/releases/download/"
         f"{VERSION}")
 
 BINARIES = [
     "auto-editor-macos-arm64",
     "auto-editor-macos-x86_64",
-    "auto-editor-windows-amd64.exe",
+    "auto-editor-windows-x86_64.exe",
     "auto-editor-linux-x86_64",
 ]
 
@@ -34,10 +34,14 @@ def for_this_machine():
     system = platform.system()
     machine = platform.machine().lower()
     if system == "Windows":
-        return "auto-editor-windows-amd64.exe"
+        return ("auto-editor-windows-aarch64.exe"
+                if machine in ("arm64", "aarch64")
+                else "auto-editor-windows-x86_64.exe")
     if system == "Darwin":
         return ("auto-editor-macos-arm64" if machine in ("arm64", "aarch64")
                 else "auto-editor-macos-x86_64")
+    if machine in ("arm64", "aarch64"):
+        return "auto-editor-linux-aarch64"
     return "auto-editor-linux-x86_64"
 
 

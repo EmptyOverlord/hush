@@ -52,6 +52,9 @@ notarised. Right-click `Hush.app` → **Open** → **Open**. Once.
 - **Padding around speech** so words don't get clipped mid-consonant
 - **Silence threshold** in dB, for noisy rooms
 - **Cut the silence, or speed it up** ×2 / ×4 instead of removing it
+- **Cut by sound, by motion, or by both** — motion detection keeps screen recordings where the picture moves but nobody talks
+- **Drop black frames** — throws away fades and dead air
+- **Smooth transitions** — a dissolve across every cut instead of a hard join
 - **Count without rendering** — tells you exactly how much will go, in a second, before committing
 - **Normalize loudness** on the way out
 - **Export to an editor instead of a file** — DaVinci Resolve, Premiere Pro, Final Cut Pro, Shotcut, Kdenlive
@@ -149,7 +152,7 @@ On a Mac you can also just double-click **Выпустить релиз.command*
 
 ## Built with
 
-- [auto-editor](https://github.com/WyattBlue/auto-editor) by WyattBlue — the engine that does the actual work. Public domain (Unlicense).
+- [auto-editor](https://github.com/WyattBlue/auto-editor) 31.5.0 by WyattBlue — the engine that does the actual work. Public domain (Unlicense).
 - [tkinterdnd2](https://github.com/Eliav2/tkinterdnd2) — drag and drop.
 - Tkinter for the interface. No heavy UI framework, which is why the download is mostly just the engine.
 
