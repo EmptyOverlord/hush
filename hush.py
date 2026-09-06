@@ -1519,9 +1519,11 @@ class App:
 
     def rebuild(self):
         """Пересобрать окно на другом языке, сохранив список файлов."""
+        tab = self.tabs.value if hasattr(self, "tabs") else "cut"
         for w in self.root.winfo_children():
             w.destroy()
         self.build()
+        self.tabs.show(tab)          # остаёмся на той же вкладке
         for p in self.files:
             self.listbox.insert("end", "  " + os.path.basename(p))
         self.show_version()
