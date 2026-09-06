@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+env:
+  # Windows consoles default to cp1252 and choke on non-ASCII output
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
+
 jobs:
   build:
     name: ${{ matrix.label }}
@@ -19,7 +24,7 @@ jobs:
           - os: macos-14
             label: macOS (Apple Silicon)
             asset: Hush-macOS-arm64.zip
-          - os: macos-13
+          - os: macos-15-intel
             label: macOS (Intel)
             asset: Hush-macOS-x86_64.zip
           - os: windows-latest

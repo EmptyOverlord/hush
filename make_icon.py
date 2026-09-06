@@ -126,5 +126,5 @@ def make_icns(png, out="hush.icns"):
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     write_png("hush.png", build())
-    print("hush.png готов")
-    print(make_icns("hush.png"), "готов")
+    print("hush.png written")
+    print(make_icns("hush.png"), "written")

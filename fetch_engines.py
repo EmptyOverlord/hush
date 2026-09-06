@@ -44,10 +44,10 @@ def for_this_machine():
 def fetch(name):
     dst = os.path.join(BIN, name)
     if os.path.exists(dst) and os.path.getsize(dst) > 1_000_000:
-        print(f"  {name} — already here")
+        print(f"  {name} - already here")
         return
     url = f"{BASE}/{name}"
-    print(f"  {name} — downloading…")
+    print(f"  {name} - downloading...")
     req = urllib.request.Request(url, headers={"User-Agent": "hush"})
     try:
         with urllib.request.urlopen(req, timeout=120) as r, \
@@ -73,7 +73,7 @@ def main():
 
     os.makedirs(BIN, exist_ok=True)
     wanted = BINARIES if args.all else [for_this_machine()]
-    print(f"auto-editor {VERSION} → bin/")
+    print(f"auto-editor {VERSION} -> bin/")
     for name in wanted:
         fetch(name)
     print("done")
