@@ -75,7 +75,9 @@ STRINGS = {
         "fmt_srt": "SRT (субтитры)",
         "fmt_text": "Просто текст",
         "subs_words": "По одному слову — для Shorts",
+        "words_hint": "каждое слово отдельной строкой со своим таймингом",
         "subs_tr": "Перевести на английский",
+        "tr_hint": "говоришь по-русски — субтитры выходят английскими",
         "subs_btn": "Сделать субтитры",
         "head_subs": "── Распознаю речь ──",
         "subs_need_model": "Сначала скачай модель на вкладке «Субтитры».",
@@ -94,6 +96,8 @@ STRINGS = {
         "det_hint_both": "оставляем, где говорят или что-то движется — для записей экрана",
         "det_hint_motion": "оставляем, где картинка меняется; звук не учитывается",
         "black": "Убирать чёрные кадры",
+        "black_hint": "выкидывает затемнения и совсем тёмные куски: заставки, "
+                      "склейки, закрытый объектив",
         "trans": "Плавные переходы",
         "trans_hint": "растворение на месте резов вместо жёсткой склейки",
         "trans_len": "Длина перехода",
@@ -116,6 +120,8 @@ STRINGS = {
         "out_timeline": "Проект {ext} для {name}. "
                         "Таймлайн с нарезкой, без перекодирования.",
         "norm": "Выровнять громкость",
+        "norm_hint": "приводит звук к ровному уровню по стандарту вещания — "
+                     "тихие места подтягивает, громкие придерживает",
         "norm_off": "Выровнять громкость — только для готового видео",
 
         "save_to": "Сохранять в:",
@@ -216,7 +222,9 @@ STRINGS = {
         "fmt_srt": "SRT (subtitles)",
         "fmt_text": "Plain text",
         "subs_words": "One word per line — for Shorts",
+        "words_hint": "every word gets its own line and timing",
         "subs_tr": "Translate into English",
+        "tr_hint": "speak any language, get English subtitles out",
         "subs_btn": "Make subtitles",
         "head_subs": "── Transcribing ──",
         "subs_need_model": "Download a model on the Subtitles tab first.",
@@ -235,6 +243,8 @@ STRINGS = {
         "det_hint_both": "keep talking or moving picture — good for screen recordings",
         "det_hint_motion": "keep where the picture changes; audio is ignored",
         "black": "Drop black frames",
+        "black_hint": "throws away fades and near-black stretches: title cards, "
+                      "dead joins, a covered lens",
         "trans": "Smooth transitions",
         "trans_hint": "dissolve across each cut instead of a hard join",
         "trans_len": "Transition length",
@@ -257,6 +267,8 @@ STRINGS = {
         "out_timeline": "A {ext} project for {name}. "
                         "Cut timeline, nothing re-encoded.",
         "norm": "Normalize loudness",
+        "norm_hint": "levels the audio to the broadcast standard — quiet parts "
+                     "come up, loud ones are held back",
         "norm_off": "Normalize loudness — video output only",
 
         "save_to": "Save to:",
@@ -1253,7 +1265,10 @@ class App:
 
         self.chk_black = Check(box, L("black"), self.s["black"],
                                self.on_black)
-        self.chk_black.pack(fill="x", pady=(0, 10))
+        self.chk_black.pack(fill="x")
+        tk.Label(box, text=L("black_hint"), bg=T.panel, fg=T.faint,
+                 font=T.font(10), anchor="w", justify="left",
+                 wraplength=330).pack(fill="x", pady=(0, 10))
 
         tk.Label(box, text=L("smooth"), bg=T.panel, fg=T.text,
                  font=T.font(12), anchor="w").pack(fill="x")
@@ -1301,7 +1316,10 @@ class App:
 
         self.chk_norm = Check(out, L("norm"), self.s["normalize"],
                               self.on_norm)
-        self.chk_norm.pack(fill="x", pady=(0, 4))
+        self.chk_norm.pack(fill="x")
+        tk.Label(out, text=L("norm_hint"), bg=T.panel, fg=T.faint,
+                 font=T.font(10), anchor="w", justify="left",
+                 wraplength=330).pack(fill="x", pady=(0, 4))
 
         # ── вкладка «Субтитры»
         tk.Label(subs, text=L("model"), bg=T.panel, fg=T.text,
@@ -1339,10 +1357,16 @@ class App:
 
         self.chk_words = Check(subs, L("subs_words"), self.s["subs_words"],
                                self.on_words)
-        self.chk_words.pack(fill="x", pady=(0, 6))
+        self.chk_words.pack(fill="x")
+        tk.Label(subs, text=L("words_hint"), bg=T.panel, fg=T.faint,
+                 font=T.font(10), anchor="w", justify="left",
+                 wraplength=330).pack(fill="x", pady=(0, 8))
         self.chk_tr = Check(subs, L("subs_tr"), self.s["subs_tr"],
                             self.on_tr)
         self.chk_tr.pack(fill="x")
+        tk.Label(subs, text=L("tr_hint"), bg=T.panel, fg=T.faint,
+                 font=T.font(10), anchor="w", justify="left",
+                 wraplength=330).pack(fill="x")
 
     def build_actions(self, parent):
         wrap = tk.Frame(parent, bg=T.bg, padx=24, pady=10)
