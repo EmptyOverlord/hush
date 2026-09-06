@@ -53,7 +53,38 @@ STRINGS = {
         "drop_hint": "Перетащи сюда файлы или нажми «Добавить файлы»",
         "no_dnd": "Нажми «Добавить файлы» — перетаскивание недоступно",
 
+        "smooth": "Сглаживание",
+        "smooth_hint": "склеивает микро-резы, чтобы речь не дёргалась",
+        "smooth_off": "выключено",
+        "speed": "Скорость речи",
+        "speed_hint": "ускоряет саму речь, а не паузы",
+        "speed_normal": "как есть",
+        "motion_sens": "Чувствительность движения",
+        "motion_hint": "меньше — замечает мелкие шевеления",
+        "tab_subs": "Субтитры",
+        "model": "Модель распознавания",
+        "model_hint": "больше модель — точнее текст, но дольше и тяжелее",
+        "model_missing": "не скачана",
+        "model_ready": "готова",
+        "dl_model": "Скачать модель",
+        "subs_lang": "Язык речи",
+        "lang_auto": "Определить",
+        "lang_ru": "Русский",
+        "lang_en": "Английский",
+        "subs_fmt": "Формат",
+        "fmt_srt": "SRT (субтитры)",
+        "fmt_text": "Просто текст",
+        "subs_words": "По одному слову — для Shorts",
+        "subs_tr": "Перевести на английский",
+        "subs_btn": "Сделать субтитры",
+        "head_subs": "── Распознаю речь ──",
+        "subs_need_model": "Сначала скачай модель на вкладке «Субтитры».",
+        "subs_done": "     готово → {name}",
+        "subs_dl": "  Качаю модель {m} ({mb} МБ). Один раз, потом лежит на диске.",
+        "subs_dl_ok": "  Модель готова.",
+        "subs_slow": "  Распознавание идёт примерно со скоростью видео. Наберись терпения.",
         "tab_cut": "Резка",
+        "tab_fine": "Точнее",
         "tab_out": "Вывод",
         "detect": "По чему резать",
         "det_audio": "По звуку",
@@ -163,7 +194,38 @@ STRINGS = {
         "drop_hint": "Drop files here, or click “Add files”",
         "no_dnd": "Click “Add files” — drag and drop is unavailable",
 
+        "smooth": "Smoothing",
+        "smooth_hint": "merges micro-cuts so speech doesn't stutter",
+        "smooth_off": "off",
+        "speed": "Speech speed",
+        "speed_hint": "speeds up the talking itself, not the pauses",
+        "speed_normal": "as recorded",
+        "motion_sens": "Motion sensitivity",
+        "motion_hint": "lower notices smaller movement",
+        "tab_subs": "Subtitles",
+        "model": "Recognition model",
+        "model_hint": "a bigger model is more accurate, but slower and heavier",
+        "model_missing": "not downloaded",
+        "model_ready": "ready",
+        "dl_model": "Download model",
+        "subs_lang": "Spoken language",
+        "lang_auto": "Detect",
+        "lang_ru": "Russian",
+        "lang_en": "English",
+        "subs_fmt": "Format",
+        "fmt_srt": "SRT (subtitles)",
+        "fmt_text": "Plain text",
+        "subs_words": "One word per line — for Shorts",
+        "subs_tr": "Translate into English",
+        "subs_btn": "Make subtitles",
+        "head_subs": "── Transcribing ──",
+        "subs_need_model": "Download a model on the Subtitles tab first.",
+        "subs_done": "     done → {name}",
+        "subs_dl": "  Downloading the {m} model ({mb} MB). Once, then it stays on disk.",
+        "subs_dl_ok": "  Model ready.",
+        "subs_slow": "  Transcribing runs at roughly video speed. Be patient.",
         "tab_cut": "Cutting",
+        "tab_fine": "Fine-tune",
         "tab_out": "Output",
         "detect": "What counts as content",
         "det_audio": "Sound",
@@ -635,6 +697,63 @@ EXPORT_INFO = {
     "kdenlive":      ("Kdenlive",         ".kdenlive"),
 }
 
+MODELS = {                       # имя: размер в МБ
+    "tiny": 74, "base": 141, "small": 465, "medium": 1462,
+}
+MODEL_URL = ("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/"
+             "ggml-{}.bin")
+
+
+def models_dir():
+    return os.path.join(os.path.dirname(update_dir()), "models")
+
+
+def model_path(name):
+    return os.path.join(models_dir(), f"ggml-{name}.bin")
+
+
+def model_ready(name):
+    p = model_path(name)
+    return os.path.isfile(p) and os.path.getsize(p) > 1_000_000
+
+
+def download_model(name, on_progress=None):
+    """Качаем модель распознавания с HuggingFace."""
+    import urllib.request
+    os.makedirs(models_dir(), exist_ok=True)
+    dst = model_path(name)
+    tmp = dst + ".part"
+    req = urllib.request.Request(MODEL_URL.format(name),
+                                 headers={"User-Agent": "hush"})
+    with urllib.request.urlopen(req, timeout=60) as r, open(tmp, "wb") as f:
+        total = int(r.headers.get("Content-Length") or 0)
+        done = 0
+        while True:
+            chunk = r.read(1 << 19)
+            if not chunk:
+                break
+            f.write(chunk)
+            done += len(chunk)
+            if on_progress and total:
+                on_progress(done / total)
+    os.replace(tmp, dst)
+    return dst
+
+
+def subs_path(src, s):
+    """Куда положить субтитры."""
+    folder = s["outdir"] or os.path.join(os.path.dirname(src), OUT_FOLDER)
+    os.makedirs(folder, exist_ok=True)
+    stem = os.path.splitext(os.path.basename(src))[0]
+    ext = ".srt" if s["subs_fmt"] == "srt" else ".txt"
+    path = os.path.join(folder, stem + ext)
+    n = 2
+    while os.path.exists(path):
+        path = os.path.join(folder, f"{stem} ({n}){ext}")
+        n += 1
+    return path
+
+
 PRESETS = {
     "soft":   {"margin": 0.50, "db": -35},
     "normal": {"margin": 0.30, "db": -30},
@@ -647,6 +766,14 @@ DEFAULTS = {
     "black": False,
     "trans": False,
     "trans_len": 0.25,
+    "smooth": 0.20,
+    "speed": 1.0,
+    "motion_sens": 0.02,
+    "model": "base",
+    "subs_lang": "auto",
+    "subs_fmt": "srt",
+    "subs_words": False,
+    "subs_tr": False,
     "preset": "normal",
     "margin": 0.30,
     "db": -30,
@@ -824,15 +951,13 @@ def cmp_version(a, b):
     return pa > pb
 
 
-MOTION = "motion:0.02"
-
-
 def edit_expr(s):
     """Выражение для --edit. Синтаксис у движка лисповый."""
     audio = f"audio:{int(s['db'])}dB"
+    motion = f"motion:{s.get('motion_sens', 0.02):.3f}"
     base = {"audio": audio,
-            "both": f"(or {audio} {MOTION})",
-            "motion": MOTION}[s.get("detect", "audio")]
+            "both": f"(or {audio} {motion})",
+            "motion": motion}[s.get("detect", "audio")]
     if s.get("black"):
         base = f"(and {base} (not blackdetect))"
     return base
@@ -845,6 +970,10 @@ def build_args(s):
             "--no-open"]
     if s.get("trans"):
         args += ["--transition", f"dissolve:{s['trans_len']}sec"]
+    sm = s.get("smooth", 0.2)
+    args += ["--smooth", "0" if sm <= 0 else f"{sm}s,{sm / 2:.2f}s"]
+    if s.get("speed", 1.0) > 1.001:
+        args += ["--when-active", f"speed:{s['speed']:.2f}"]
     if s["silent"] != "cut":
         args += ["--when-silent", f"speed:{s['silent']}"]
     if s["normalize"] and s["export"] == "default":
@@ -1035,10 +1164,13 @@ class App:
         head.place(relx=1.0, y=-4, anchor="ne")
         Btn(head, L("defaults"), self.reset_all, pad=(10, 3)).pack()
 
-        self.tabs = Tabs(box, [("cut", L("tab_cut")), ("out", L("tab_out"))])
+        self.tabs = Tabs(box, [("cut", L("tab_cut")), ("fine", L("tab_fine")),
+                               ("out", L("tab_out")), ("subs", L("tab_subs"))])
         self.tabs.pack(fill="both", expand=True)
         cut = self.tabs.page("cut")
+        fine = self.tabs.page("fine")
         out = self.tabs.page("out")
+        subs = self.tabs.page("subs")
 
         self.seg_preset = Seg(
             cut, [(k, L(k)) for k in ("soft", "normal", "tight")],
@@ -1070,7 +1202,8 @@ class App:
             self.s["silent"], self.on_silent)
         self.seg_silent.pack(fill="x", pady=(0, 12))
 
-        # по чему резать
+        # ── вкладка «Точнее»
+        box = fine
         tk.Label(box, text=L("detect"), bg=T.panel, fg=T.text,
                  font=T.font(12), anchor="w").pack(fill="x", pady=(0, 4))
         self.seg_detect = Seg(
@@ -1083,9 +1216,33 @@ class App:
             anchor="nw", justify="left", wraplength=330, height=2)
         self.lbl_detect.pack(fill="x", pady=(0, 8))
 
+        self.sl_motion = Slider(box, 0.005, 0.100, self.s["motion_sens"],
+                                0.005, lambda v: f"{v * 100:.1f} %",
+                                self.on_motion_sens)
+
         self.chk_black = Check(box, L("black"), self.s["black"],
                                self.on_black)
-        self.chk_black.pack(fill="x", pady=(0, 4))
+        self.chk_black.pack(fill="x", pady=(0, 10))
+
+        tk.Label(box, text=L("smooth"), bg=T.panel, fg=T.text,
+                 font=T.font(12), anchor="w").pack(fill="x")
+        tk.Label(box, text=L("smooth_hint"), bg=T.panel, fg=T.faint,
+                 font=T.font(10), anchor="w").pack(fill="x")
+        self.sl_smooth = Slider(
+            box, 0.0, 0.60, self.s["smooth"], 0.05,
+            lambda v: L("smooth_off") if v <= 0 else f"{v:.2f} {L('unit_sec')}",
+            self.on_smooth)
+        self.sl_smooth.pack(fill="x", pady=(2, 10))
+
+        tk.Label(box, text=L("speed"), bg=T.panel, fg=T.text,
+                 font=T.font(12), anchor="w").pack(fill="x")
+        tk.Label(box, text=L("speed_hint"), bg=T.panel, fg=T.faint,
+                 font=T.font(10), anchor="w").pack(fill="x")
+        self.sl_speed = Slider(
+            box, 1.0, 2.0, self.s["speed"], 0.05,
+            lambda v: L("speed_normal") if v <= 1.001 else f"×{v:.2f}",
+            self.on_speed)
+        self.sl_speed.pack(fill="x", pady=(2, 4))
 
         # ── вкладка «Вывод»
         tk.Label(out, text=L("output"), bg=T.panel, fg=T.text,
@@ -1115,6 +1272,48 @@ class App:
                               self.on_norm)
         self.chk_norm.pack(fill="x", pady=(0, 4))
 
+        # ── вкладка «Субтитры»
+        tk.Label(subs, text=L("model"), bg=T.panel, fg=T.text,
+                 font=T.font(12), anchor="w").pack(fill="x")
+        tk.Label(subs, text=L("model_hint"), bg=T.panel, fg=T.faint,
+                 font=T.font(10), anchor="w").pack(fill="x", pady=(0, 4))
+        self.seg_model = Seg(
+            subs, [(m, f"{m}  {MODELS[m]} МБ" if LANG == "ru"
+                    else f"{m}  {MODELS[m]} MB") for m in MODELS],
+            self.s["model"], self.on_model, columns=2)
+        self.seg_model.pack(fill="x", pady=(0, 4))
+
+        row = tk.Frame(subs, bg=T.panel)
+        row.pack(fill="x", pady=(0, 12))
+        self.lbl_model = tk.Label(row, text="", bg=T.panel, fg=T.dim,
+                                  font=T.font(11), anchor="w")
+        self.lbl_model.pack(side="left")
+        self.btn_model = Btn(row, L("dl_model"), self.start_model,
+                             pad=(12, 5))
+        self.btn_model.pack(side="right")
+
+        tk.Label(subs, text=L("subs_lang"), bg=T.panel, fg=T.text,
+                 font=T.font(12), anchor="w").pack(fill="x", pady=(0, 4))
+        self.seg_slang = Seg(
+            subs, [("auto", L("lang_auto")), ("ru", L("lang_ru")),
+                   ("en", L("lang_en"))],
+            self.s["subs_lang"], self.on_slang)
+        self.seg_slang.pack(fill="x", pady=(0, 12))
+
+        tk.Label(subs, text=L("subs_fmt"), bg=T.panel, fg=T.text,
+                 font=T.font(12), anchor="w").pack(fill="x", pady=(0, 4))
+        self.seg_sfmt = Seg(
+            subs, [("srt", L("fmt_srt")), ("text", L("fmt_text"))],
+            self.s["subs_fmt"], self.on_sfmt)
+        self.seg_sfmt.pack(fill="x", pady=(0, 12))
+
+        self.chk_words = Check(subs, L("subs_words"), self.s["subs_words"],
+                               self.on_words)
+        self.chk_words.pack(fill="x", pady=(0, 6))
+        self.chk_tr = Check(subs, L("subs_tr"), self.s["subs_tr"],
+                            self.on_tr)
+        self.chk_tr.pack(fill="x")
+
     def build_actions(self, parent):
         wrap = tk.Frame(parent, bg=T.bg, padx=24, pady=10)
         wrap.pack(fill="x", side="bottom")
@@ -1141,6 +1340,9 @@ class App:
         self.btn_preview = Btn(row, L("preview"), self.start_preview,
                                pad=(20, 12))
         self.btn_preview.pack(side="left", padx=(10, 0))
+        self.btn_subs = Btn(row, L("subs_btn"), self.start_subs,
+                            pad=(20, 12))
+        self.btn_subs.pack(side="left", padx=(10, 0))
         self.btn_stop = Btn(row, L("stop"), self.stop_run, pad=(20, 12))
         self.btn_stop.pack(side="left", padx=(10, 0))
         self.btn_stop.enable(False)
@@ -1229,6 +1431,16 @@ class App:
         video = self.s["export"] == "default"
         self.chk_norm.enable(video, L("norm") if video else L("norm_off"))
         self.lbl_detect.config(text=L("det_hint_" + self.s["detect"]))
+        ready = model_ready(self.s["model"])
+        self.lbl_model.config(
+            text=L("model_ready") if ready else L("model_missing"),
+            fg=T.good if ready else T.dim)
+        self.btn_model.enable(not ready)
+        if self.s["detect"] in ("both", "motion"):
+            self.sl_motion.pack(fill="x", pady=(0, 8),
+                                before=self.chk_black)
+        else:
+            self.sl_motion.pack_forget()
 
     def apply_preset(self, key):
         if not key:
@@ -1266,6 +1478,39 @@ class App:
         self.refresh_labels()
         self.save_settings()
 
+    def on_model(self, key):
+        self.s["model"] = key
+        self.refresh_labels()
+        self.save_settings()
+
+    def on_slang(self, key):
+        self.s["subs_lang"] = key
+        self.save_settings()
+
+    def on_sfmt(self, key):
+        self.s["subs_fmt"] = key
+        self.save_settings()
+
+    def on_words(self, v):
+        self.s["subs_words"] = v
+        self.save_settings()
+
+    def on_tr(self, v):
+        self.s["subs_tr"] = v
+        self.save_settings()
+
+    def on_motion_sens(self, v):
+        self.s["motion_sens"] = v
+        self.save_settings()
+
+    def on_smooth(self, v):
+        self.s["smooth"] = v
+        self.save_settings()
+
+    def on_speed(self, v):
+        self.s["speed"] = v
+        self.save_settings()
+
     def on_black(self, v):
         self.s["black"] = v
         self.save_settings()
@@ -1296,6 +1541,14 @@ class App:
         self.chk_black.set(self.s["black"])
         self.chk_trans.set(self.s["trans"])
         self.sl_trans.set(self.s["trans_len"])
+        self.sl_smooth.set(self.s["smooth"])
+        self.sl_speed.set(self.s["speed"])
+        self.sl_motion.set(self.s["motion_sens"])
+        self.seg_model.set(self.s["model"])
+        self.seg_slang.set(self.s["subs_lang"])
+        self.seg_sfmt.set(self.s["subs_fmt"])
+        self.chk_words.set(self.s["subs_words"])
+        self.chk_tr.set(self.s["subs_tr"])
         self.chk_norm.set(self.s["normalize"])
         self.refresh_labels()
         self.save_settings()
@@ -1376,6 +1629,8 @@ class App:
                     self.status.config(text=payload)
                 elif kind == "progress":
                     self.progress.set(payload)
+                elif kind == "labels":
+                    self.refresh_labels()
                 elif kind == "version":
                     self.lbl_ver.config(text=payload)
                 elif kind == "update_done":
@@ -1459,6 +1714,7 @@ class App:
         self.busy = on
         self.btn_run.enable(not on)
         self.btn_preview.enable(not on)
+        self.btn_subs.enable(not on)
         self.btn_lang.enable(not on)
         self.btn_stop.enable(on)
 
@@ -1467,6 +1723,98 @@ class App:
         self.progress.set(0)
         self.status.config(text="")
         self.proc = None
+
+    def start_model(self):
+        if self.busy or model_ready(self.s["model"]):
+            return
+        self.lock(True)
+        self.stop_flag = False
+        threading.Thread(target=self.work_model, daemon=True).start()
+
+    def work_model(self):
+        name = self.s["model"]
+        self.say("", "dim")
+        self.say(L("subs_dl", m=name, mb=MODELS[name]), "acc")
+        try:
+            download_model(
+                name,
+                lambda f: (self.queue.put(("progress", f)),
+                           self.queue.put(("status",
+                                           L("st_dl", p=f"{f * 100:.0f}")))))
+            self.say(L("subs_dl_ok"), "ok")
+        except Exception as e:
+            self.say(L("dl_fail", e=e), "bad")
+        self.queue.put(("labels", None))
+        self.queue.put(("done", None))
+
+    def start_subs(self):
+        if not self.guard():
+            return
+        if not model_ready(self.s["model"]):
+            self.log(L("subs_need_model"), "bad")
+            return
+        self.lock(True)
+        self.stop_flag = False
+        threading.Thread(target=self.work_subs, daemon=True).start()
+
+    def work_subs(self):
+        self.say("", "dim")
+        self.say(L("head_subs"), "acc")
+        self.say(L("subs_slow"), "dim")
+        total = len(self.files)
+        made = []
+
+        for i, src in enumerate(self.files):
+            if self.stop_flag:
+                break
+            name = os.path.basename(src)
+            dst = subs_path(src, self.s)
+            self.say(f"  {name}", "txt")
+            self.queue.put(("status", L("st_counting", i=i + 1, n=total)))
+            self.queue.put(("progress", (i + 0.5) / total))
+
+            cmd = (self.bin + ["whisper", src, model_path(self.s["model"]),
+                               "--format", self.s["subs_fmt"], "-o", dst])
+            if self.s["subs_lang"] != "auto":
+                cmd += ["--language", self.s["subs_lang"]]
+            if self.s["subs_words"]:
+                cmd += ["--split-words"]
+            if self.s["subs_tr"]:
+                cmd += ["--translate"]
+
+            try:
+                self.proc = subprocess.Popen(
+                    cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, encoding="utf-8", errors="replace",
+                    bufsize=1, **no_window())
+                tail = []
+                for line in self.proc.stdout:
+                    if self.stop_flag:
+                        break
+                    line = ANSI.sub("", line).strip()
+                    if line:
+                        tail.append(line)
+                        tail = tail[-6:]
+                code = self.proc.wait()
+            except Exception as e:
+                self.say(L("cant_start", e=e), "bad")
+                continue
+
+            if self.stop_flag:
+                break
+            if code == 0 and os.path.exists(dst):
+                self.say(L("subs_done", name=os.path.basename(dst)), "ok")
+                made.append(dst)
+            else:
+                self.say(L("fail_file", code=code), "bad")
+                for t in tail:
+                    if "rror" in t:
+                        self.say(f"     {t}", "bad")
+
+        if made:
+            self.say(L("done_all", ok=len(made), total=total), "acc")
+            reveal(made[0])
+        self.queue.put(("done", None))
 
     def start_preview(self):
         if not self.guard():

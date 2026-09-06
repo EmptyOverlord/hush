@@ -52,14 +52,31 @@ notarised. Right-click `Hush.app` → **Open** → **Open**. Once.
 - **Padding around speech** so words don't get clipped mid-consonant
 - **Silence threshold** in dB, for noisy rooms
 - **Cut the silence, or speed it up** ×2 / ×4 instead of removing it
+- **Speed up the talking itself**, up to ×2, while the pauses go
 - **Cut by sound, by motion, or by both** — motion detection keeps screen recordings where the picture moves but nobody talks
 - **Drop black frames** — throws away fades and dead air
+- **Smoothing** merges micro-cuts so the speech doesn't stutter
 - **Smooth transitions** — a dissolve across every cut instead of a hard join
 - **Count without rendering** — tells you exactly how much will go, in a second, before committing
 - **Normalize loudness** on the way out
 - **Export to an editor instead of a file** — DaVinci Resolve, Premiere Pro, Final Cut Pro, Shotcut, Kdenlive
 - **Russian and English**, switched with one button, remembered between runs
 - **Update the engine** from inside the app when you're online
+
+## Subtitles, offline
+
+Hush also transcribes. Speech recognition runs **on your machine** — nothing is
+uploaded, and it works with the network off once the model is downloaded.
+
+- **SRT** ready to upload to YouTube, or plain text
+- **One word per line** — the bouncing-word captions Shorts are made of
+- **Translate into English** while transcribing, so a Russian recording gives
+  English subtitles in one pass
+- Pick your model: `tiny` (74 MB) through `medium` (1.5 GB). Bigger is more
+  accurate and slower — `base` is a decent start, `small` is noticeably better
+  for languages other than English
+
+Downloaded once, the model is kept in your user folder and reused.
 
 ## Finished video, or a timeline?
 
