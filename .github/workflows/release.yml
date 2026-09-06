@@ -1,0 +1,76 @@
+name: Build release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            label: macOS (Apple Silicon)
+            asset: Hush-macOS-arm64.zip
+          - os: macos-13
+            label: macOS (Intel)
+            asset: Hush-macOS-x86_64.zip
+          - os: windows-latest
+            label: Windows
+            asset: Hush-Windows-x64.zip
+          - os: ubuntu-latest
+            label: Linux
+            asset: Hush-Linux-x86_64.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller tkinterdnd2
+
+      - name: Fetch auto-editor engines
+        run: python fetch_engines.py --all
+
+      - name: Build
+        run: python -m PyInstaller --noconfirm --clean hush.spec
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          rm -rf Hush
+          ditto -c -k --sequesterRsrc --keepParent Hush.app ../${{ matrix.asset }}
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path dist/Hush/* -DestinationPath ${{ matrix.asset }}
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd dist
+          zip -qr ../${{ matrix.asset }} Hush
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset }}

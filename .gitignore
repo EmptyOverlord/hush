@@ -1,0 +1,13 @@
+# движки качаются скриптом, в репозитории им не место
+bin/
+
+# сборка
+build/
+dist/
+*.spec.bak
+__pycache__/
+*.pyc
+
+# личные настройки
+settings.json
+.DS_Store
