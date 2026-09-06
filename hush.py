@@ -470,6 +470,8 @@ class Seg(tk.Frame):
         self.value = value
         self.on_change = on_change
         self.cells = {}
+        self.marked = set()      # ключи, которые уже есть на диске
+        self.labels = dict(options)
 
         cols = columns or len(options)
         for i, (key, label) in enumerate(options):
@@ -486,15 +488,28 @@ class Seg(tk.Frame):
     def _paint(self):
         for key, cell in self.cells.items():
             on = key == self.value
-            cell.config(bg=T.accent if on else T.panel2,
-                        fg="#FFFFFF" if on else T.dim,
-                        font=T.font(12, on))
+            have = key in self.marked
+            if on:
+                bg, fg = T.accent, "#FFFFFF"
+            elif have:
+                bg, fg = T.line, T.text        # скачана — светлее и ярче
+            else:
+                bg, fg = T.panel2, T.dim
+            text = self.labels.get(key, "")
+            if have and not on:
+                text += "  ✓"
+            cell.config(bg=bg, fg=fg, font=T.font(12, on), text=text)
 
     def set(self, key):
         self.value = key
         self._paint()
         if self.on_change:
             self.on_change(key)
+
+    def set_marks(self, keys):
+        """Отметить ячейки, которые уже загружены."""
+        self.marked = set(keys)
+        self._paint()
 
 
 class Tabs(tk.Frame):
@@ -1446,6 +1461,7 @@ class App:
         video = self.s["export"] == "default"
         self.chk_norm.enable(video, L("norm") if video else L("norm_off"))
         self.lbl_detect.config(text=L("det_hint_" + self.s["detect"]))
+        self.seg_model.set_marks(m for m in MODELS if model_ready(m))
         ready = model_ready(self.s["model"])
         self.lbl_model.config(
             text=L("model_ready") if ready else L("model_missing"),
