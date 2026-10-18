@@ -51,13 +51,14 @@ notarised. Right-click `Hush.app` → **Open** → **Open**. Once.
 - **Three presets** — Soft, Normal, Tight — for how hard to cut
 - **Padding around speech** so words don't get clipped mid-consonant
 - **Silence threshold** in dB, for noisy rooms
-- **Cut the silence, or speed it up** ×2 / ×4 instead of removing it
+- **Cut the silence, or speed it up** ×2, ×4, or any speed you type in — ×100 if you like
 - **Speed up the talking itself**, up to ×2, while the pauses go
 - **Cut by sound, by motion, or by both** — motion detection keeps screen recordings where the picture moves but nobody talks
 - **Drop black frames** — throws away fades and dead air
 - **Smoothing** merges micro-cuts so the speech doesn't stutter
 - **Smooth transitions** — a dissolve across every cut instead of a hard join
 - **Count without rendering** — tells you exactly how much will go, in a second, before committing
+- **Time left** — an estimate under the buttons that keeps itself honest as the render goes
 - **Normalize loudness** on the way out
 - **Export to an editor instead of a file** — DaVinci Resolve, Premiere Pro, Final Cut Pro, Shotcut, Kdenlive
 - **Russian and English**, switched with one button, remembered between runs
@@ -99,17 +100,18 @@ places the engine got wrong. For real work, take this one.
 
 ## Your original is never touched
 
-Results go into a `Hush` folder next to the source:
+The result lands next to the source, with `hush_` in front of the name:
 
 ```
 My videos/
   talk.mp4              ← untouched
-  Hush/
-    talk_no_pauses.mp4  ← result
+  hush_talk.mp4         ← result
 ```
 
 The app refuses to write to the input path, and adds a number if a name would
-collide. You can point it somewhere else with **Choose folder**.
+collide. You can point it somewhere else with **Choose folder**; the `hush_`
+prefix comes along. Subtitles keep the source's name (`talk.srt`), since their
+timing belongs to the source and players pick them up on their own.
 
 ## Honest limitations
 

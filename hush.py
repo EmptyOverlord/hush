@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import tkinter as tk
 import webbrowser
 from tkinter import filedialog
@@ -116,6 +117,8 @@ STRINGS = {
         "cut": "Вырезать",
         "speed2": "Ускорить ×2",
         "speed4": "Ускорить ×4",
+        "custom": "Своя скорость",
+        "custom_hint": "во сколько раз ускорить паузы — хоть ×100",
         "output": "Что на выходе",
         "video": "Готовое видео",
         "out_video": "Готовый файл. Быстро, но правки уже не внести.",
@@ -127,7 +130,7 @@ STRINGS = {
         "norm_off": "Выровнять громкость — только для готового видео",
 
         "save_to": "Сохранять в:",
-        "beside": "папку Hush рядом с оригиналом",
+        "beside": "папку с оригиналом, имя начнётся с hush_",
         "choose": "Выбрать папку",
         "reset": "Сброс",
         "run": "Обработать",
@@ -151,7 +154,7 @@ STRINGS = {
         "cant_start": "     не запустилось: {e}",
         "done_file": "     готово → {name}  ({size})",
         "fail_file": "     не получилось (код {code})",
-        "done_all": "Готово: {ok} из {total}.",
+        "done_all": "Готово: {ok} из {total} за {t}.",
         "stopped": "Остановлено.",
         "settings_reset": "Настройки сброшены к обычным.",
 
@@ -170,14 +173,16 @@ STRINGS = {
         "st_analyze": "анализ звука",
         "st_render": "рендер",
         "st_line": "{stage} · {i} из {n} · {p}%",
+        "eta": "осталось ≈ {t}",
+        "eta_wait": "оцениваю время…",
 
         "sec": "{n} сек",
         "min": "{m}:{s:02d} мин",
+        "t_sec": "{s} сек",
+        "t_min": "{m} мин {s:02d} сек",
+        "t_hour": "{h} ч {m:02d} мин",
         "mb": "{n} МБ",
         "kb": "{n} КБ",
-        "sfx_cut": "_без_пауз",
-        "sfx_speed": "_ускорено",
-        "sfx_timeline": "_таймлайн",
         "dlg_files": "Выбери видео",
         "dlg_folder": "Куда сохранять результат",
         "ft_media": "Видео и звук",
@@ -265,6 +270,8 @@ STRINGS = {
         "cut": "Cut out",
         "speed2": "Speed ×2",
         "speed4": "Speed ×4",
+        "custom": "Custom speed",
+        "custom_hint": "how many times faster the pauses play — even ×100",
         "output": "Output",
         "video": "Finished video",
         "out_video": "A finished file. Fast, but no edits afterwards.",
@@ -276,7 +283,7 @@ STRINGS = {
         "norm_off": "Normalize loudness — video output only",
 
         "save_to": "Save to:",
-        "beside": "a Hush folder next to the original",
+        "beside": "the original's folder, named hush_…",
         "choose": "Choose folder",
         "reset": "Reset",
         "run": "Process",
@@ -300,7 +307,7 @@ STRINGS = {
         "cant_start": "     failed to start: {e}",
         "done_file": "     done → {name}  ({size})",
         "fail_file": "     failed (code {code})",
-        "done_all": "Done: {ok} of {total}.",
+        "done_all": "Done: {ok} of {total} in {t}.",
         "stopped": "Stopped.",
         "settings_reset": "Settings reset to normal.",
 
@@ -319,14 +326,16 @@ STRINGS = {
         "st_analyze": "analyzing audio",
         "st_render": "rendering",
         "st_line": "{stage} · {i} of {n} · {p}%",
+        "eta": "about {t} left",
+        "eta_wait": "estimating time…",
 
         "sec": "{n} sec",
         "min": "{m}:{s:02d} min",
+        "t_sec": "{s} sec",
+        "t_min": "{m} min {s:02d} sec",
+        "t_hour": "{h} h {m:02d} min",
         "mb": "{n} MB",
         "kb": "{n} KB",
-        "sfx_cut": "_no_pauses",
-        "sfx_speed": "_sped_up",
-        "sfx_timeline": "_timeline",
         "dlg_files": "Choose video",
         "dlg_folder": "Where to save the result",
         "ft_media": "Video and audio",
@@ -537,6 +546,112 @@ class Seg(tk.Frame):
         """Отметить ячейки, которые уже загружены."""
         self.marked = set(keys)
         self._paint()
+
+
+def num_text(v):
+    """10.0 → «10», 2.5 → «2.5»."""
+    return f"{v:g}"
+
+
+def parse_num(text):
+    """Число из поля ввода. Запятая тоже годится, «×» и «x» не мешают."""
+    text = text.strip().lower().strip("×x ").replace(",", ".")
+    try:
+        v = float(text)
+    except ValueError:
+        return None
+    return v if math.isfinite(v) else None
+
+
+class NumCell(tk.Frame):
+    """Ячейка в пару к Seg, только со своим числом внутри.
+
+    Клик по ней — выбрать её, дальше просто печатаешь значение."""
+
+    def __init__(self, parent, text, value, lo, hi, on=False, on_change=None):
+        super().__init__(parent, bg=T.panel2, cursor="hand2")
+        self.lo, self.hi = lo, hi        # lo не включаем, hi включаем
+        self.value = value
+        self.on = on
+        self.on_change = on_change
+        self._quiet = False              # меняем текст сами, а не человек
+
+        self.lbl = tk.Label(self, text=text, bg=T.panel2, fg=T.dim,
+                            font=T.font(12), padx=12, pady=7, cursor="hand2")
+        self.lbl.pack(side="left")
+        self.var = tk.StringVar(value=num_text(value))
+        self.entry = tk.Entry(
+            self, textvariable=self.var, width=7, justify="center",
+            font=T.font(13, True), bg=T.bg, fg=T.text,
+            insertbackground=T.text, relief="flat", borderwidth=0,
+            highlightthickness=1, highlightbackground=T.line,
+            highlightcolor=T.accent2)
+        self.entry.pack(side="right", padx=(0, 6), pady=5, ipady=2)
+        self.unit = tk.Label(self, text="×", bg=T.panel2, fg=T.dim,
+                             font=T.font(13, True), padx=6, cursor="hand2")
+        self.unit.pack(side="right")
+
+        for w in (self, self.lbl, self.unit):
+            w.bind("<Button-1>", self._click)
+        self.entry.bind("<FocusIn>", lambda _e: self.pick())
+        self.entry.bind("<FocusOut>", lambda _e: self._restore())
+        self.entry.bind("<Return>",
+                        lambda _e: self.winfo_toplevel().focus_set())
+        self.var.trace_add("write", self._typed)
+        self._paint()
+
+    def _ok(self, v):
+        return v is not None and self.lo < v <= self.hi
+
+    def _paint(self):
+        bg, fg = (T.accent, "#FFFFFF") if self.on else (T.panel2, T.dim)
+        self.config(bg=bg)
+        self.lbl.config(bg=bg, fg=fg, font=T.font(12, self.on))
+        self.unit.config(bg=bg, fg=fg)
+        good = self._ok(parse_num(self.var.get()))
+        self.entry.config(fg=T.text if good else T.bad)
+
+    def _click(self, _=None):
+        self.entry.focus_set()
+        self.entry.select_range(0, "end")
+        self.pick()
+
+    def _typed(self, *_a):
+        v = parse_num(self.var.get())
+        self._paint()
+        if self._quiet:
+            return
+        if self._ok(v):
+            self.value = v
+            self.pick(force=True)
+
+    def _restore(self):
+        """Ушли из поля с ерундой — возвращаем последнее нормальное число."""
+        if not self._ok(parse_num(self.var.get())):
+            self._put(self.value)
+
+    def pick(self, force=False):
+        if self.on and not force:
+            return
+        self.on = True
+        self._paint()
+        if self.on_change:
+            self.on_change(self.value)
+
+    def drop(self):
+        """Выбрали что-то другое рядом."""
+        self.on = False
+        self._paint()
+
+    def set(self, value, on):
+        self.value = value
+        self.on = on
+        self._put(value)
+
+    def _put(self, value):
+        self._quiet = True
+        self.var.set(num_text(value))
+        self._quiet = False
 
 
 class Tabs(tk.Frame):
@@ -850,8 +965,9 @@ def download_model(name, on_progress=None):
 
 
 def subs_path(src, s):
-    """Куда положить субтитры."""
-    folder = s["outdir"] or os.path.join(os.path.dirname(src), OUT_FOLDER)
+    """Куда положить субтитры. Имя как у исходника — тайминги ведь от него,
+    и плеер подхватит их сам."""
+    folder = s["outdir"] or os.path.dirname(src)
     os.makedirs(folder, exist_ok=True)
     stem = os.path.splitext(os.path.basename(src))[0]
     ext = ".srt" if s["subs_fmt"] == "srt" else ".txt"
@@ -887,6 +1003,7 @@ DEFAULTS = {
     "margin": 0.30,
     "db": -30,
     "silent": "cut",
+    "silent_custom": 10.0,
     "export": "default",
     "normalize": False,
     "outdir": "",
@@ -1084,36 +1201,43 @@ def build_args(s):
     if s.get("speed", 1.0) > 1.001:
         args += ["--when-active", f"speed:{s['speed']:.2f}"]
     if s["silent"] != "cut":
-        args += ["--when-silent", f"speed:{s['silent']}"]
+        args += ["--when-silent", f"speed:{num_text(silent_speed(s))}"]
     if s["normalize"] and s["export"] == "default":
         args += ["--audio-normalize", "ebu"]
     return args
 
 
-OUT_FOLDER = "Hush"
+SILENT_MAX = 99998     # движок берёт скорость строго меньше 99999
+
+
+def silent_speed(s):
+    """Во сколько раз ускорять тишину: ×2, ×4 или своё число."""
+    if s["silent"] == "custom":
+        return min(SILENT_MAX, float(s.get("silent_custom") or 10))
+    return float(s["silent"])
+
+
+OUT_PREFIX = "hush_"
 
 
 def out_path(src, s):
-    """Куда положить результат. Оригинал не трогаем никогда."""
-    if s["outdir"]:
-        folder = s["outdir"]
-    else:
-        # своя папка рядом с оригиналом — перепутать невозможно
-        folder = os.path.join(os.path.dirname(src), OUT_FOLDER)
+    """Куда положить результат. Оригинал не трогаем никогда.
+
+    Папку не выбрали — кладём рядом с оригиналом, а hush_ в начале имени
+    не даёт их перепутать."""
+    folder = s["outdir"] or os.path.dirname(src)
     os.makedirs(folder, exist_ok=True)
-    stem = os.path.splitext(os.path.basename(src))[0]
+    stem = OUT_PREFIX + os.path.splitext(os.path.basename(src))[0]
     if s["export"] == "default":
         ext = os.path.splitext(src)[1] or ".mp4"
-        suffix = L("sfx_cut") if s["silent"] == "cut" else L("sfx_speed")
     else:
         ext = EXPORT_INFO[s["export"]][1]
-        suffix = L("sfx_timeline")
-    path = os.path.join(folder, stem + suffix + ext)
+    path = os.path.join(folder, stem + ext)
     n = 2
     # никогда не писать поверх исходника и поверх готового файла
     while (os.path.exists(path)
            or os.path.abspath(path) == os.path.abspath(src)):
-        path = os.path.join(folder, f"{stem}{suffix} ({n}){ext}")
+        path = os.path.join(folder, f"{stem} ({n}){ext}")
         n += 1
     return path
 
@@ -1145,6 +1269,69 @@ def human(hms):
     if total < 60:
         return L("sec", n=f"{total:.0f}")
     return L("min", m=int(total // 60), s=int(total % 60))
+
+
+def dur(sec):
+    """95 → «1 мин 35 сек», 4000 → «1 ч 06 мин»."""
+    sec = max(0, int(round(sec)))
+    if sec < 60:
+        return L("t_sec", s=sec)
+    if sec < 3600:
+        return L("t_min", m=sec // 60, s=sec % 60)
+    return L("t_hour", h=sec // 3600, m=sec % 3600 // 60)
+
+
+class Eta:
+    """Сколько ещё ждать всю очередь. Считаем по тому, как быстро работа
+    идёт на самом деле, а не по догадкам.
+
+    Вес файла — его размер: в нём сидят и длина, и разрешение, а от них
+    и зависит, сколько рендерить."""
+
+    WARMUP = 2.0      # первые секунды стадии скорость скачет — молчим
+
+    def __init__(self, files):
+        self.w = [max(1, os.path.getsize(p)) if os.path.isfile(p) else 1
+                  for p in files]
+        self.done_w = 0.0     # вес уже готовых файлов
+        self.done_t = 0.0     # и сколько секунд на них ушло
+        self.start(0)
+
+    def start(self, i):
+        self.i = i
+        self.file_t0 = time.monotonic()
+        self.stage = None
+
+    def finish(self):
+        """Файл готов — запоминаем, сколько он занял."""
+        self.done_w += self.w[self.i]
+        self.done_t += time.monotonic() - self.file_t0
+
+    def left(self, stage, analyzing, cur, tot):
+        """Секунд до конца всей очереди. None — пока рано судить."""
+        now = time.monotonic()
+        if stage != self.stage:
+            self.stage, self.t0, self.c0 = stage, now, cur
+        spent = now - self.t0
+        rate = (cur - self.c0) / spent if spent > 0 else 0
+        stage_left = ((tot - cur) / rate
+                      if spent >= self.WARMUP and rate > 0 else None)
+
+        per_w = self.done_t / self.done_w if self.done_w else None
+        in_file = now - self.file_t0
+        if analyzing:
+            # рендер ещё впереди: прикидываем по тем файлам, что уже готовы
+            if per_w is None:
+                return None
+            file_left = max(stage_left or 0,
+                            self.w[self.i] * per_w - in_file)
+        else:
+            if stage_left is None:
+                return None
+            file_left = stage_left
+            if per_w is None:
+                per_w = (in_file + file_left) / self.w[self.i]
+        return file_left + sum(self.w[self.i + 1:]) * per_w
 
 
 def reveal(path):
@@ -1314,7 +1501,12 @@ class App:
         self.seg_silent = Seg(
             box, [("cut", L("cut")), ("2", L("speed2")), ("4", L("speed4"))],
             self.s["silent"], self.on_silent)
-        self.seg_silent.pack(fill="x", pady=(0, 12))
+        self.seg_silent.pack(fill="x")
+        self.cell_silent = NumCell(
+            box, L("custom"), self.s["silent_custom"], 1, SILENT_MAX,
+            self.s["silent"] == "custom", self.on_custom)
+        self.cell_silent.pack(fill="x", padx=(0, 4))
+        hint(box, L("custom_hint")).pack(fill="x", pady=(2, 12))
 
         # ── вкладка «Точнее»
         box = fine
@@ -1473,9 +1665,13 @@ class App:
         self.btn_stop.pack(side="left", padx=(10, 0))
         self.btn_stop.enable(False)
 
-        self.status = tk.Label(row, text="", bg=T.bg, fg=T.dim,
+        side = tk.Frame(row, bg=T.bg)
+        side.pack(side="right")
+        self.eta = tk.Label(side, text="", bg=T.bg, fg=T.accent2,
+                            font=T.font(13, True), anchor="e")
+        self.status = tk.Label(side, text="", bg=T.bg, fg=T.dim,
                                font=T.font(12), anchor="e")
-        self.status.pack(side="right")
+        self.status.pack(anchor="e")
 
         self.progress = Progress(wrap)
         self.progress.pack(fill="x", pady=(10, 0))
@@ -1594,7 +1790,17 @@ class App:
         self.save_settings()
 
     def on_silent(self, key):
+        if not key:          # это NumCell снял выделение — не наше дело
+            return
         self.s["silent"] = key
+        self.cell_silent.drop()
+        self.root.focus_set()          # увести курсор из поля скорости
+        self.save_settings()
+
+    def on_custom(self, v):
+        self.s["silent"] = "custom"
+        self.s["silent_custom"] = v
+        self.seg_silent.set("")
         self.save_settings()
 
     def on_export(self, key):
@@ -1665,6 +1871,7 @@ class App:
         self.sl_db.set(self.s["db"])
         self.seg_preset.set(self.s["preset"])
         self.seg_silent.set(self.s["silent"])
+        self.cell_silent.set(self.s["silent_custom"], False)
         self.seg_export.set(self.s["export"])
         self.seg_detect.set(self.s["detect"])
         self.chk_black.set(self.s["black"])
@@ -1758,6 +1965,8 @@ class App:
                     self.status.config(text=payload)
                 elif kind == "progress":
                     self.progress.set(payload)
+                elif kind == "eta":
+                    self.show_eta(payload)
                 elif kind == "labels":
                     self.refresh_labels()
                 elif kind == "version":
@@ -1851,7 +2060,16 @@ class App:
         self.lock(False)
         self.progress.set(0)
         self.status.config(text="")
+        self.show_eta(None)
         self.proc = None
+
+    def show_eta(self, text):
+        """Строка «осталось ≈ …» над стадией. Нет текста — прячем."""
+        if text:
+            self.eta.config(text=text)
+            self.eta.pack(anchor="e", before=self.status)
+        else:
+            self.eta.pack_forget()
 
     def start_model(self):
         if self.busy or model_ready(self.s["model"]):
@@ -1887,6 +2105,7 @@ class App:
         threading.Thread(target=self.work_subs, daemon=True).start()
 
     def work_subs(self):
+        t_start = time.monotonic()
         self.say("", "dim")
         self.say(L("head_subs"), "acc")
         self.say(L("subs_slow"), "dim")
@@ -1941,7 +2160,8 @@ class App:
                         self.say(f"     {t}", "bad")
 
         if made:
-            self.say(L("done_all", ok=len(made), total=total), "acc")
+            self.say(L("done_all", ok=len(made), total=total,
+                       t=dur(time.monotonic() - t_start)), "acc")
             reveal(made[0])
         self.queue.put(("done", None))
 
@@ -2003,10 +2223,15 @@ class App:
         self.say(L("head_run"), "acc")
         total = len(self.files)
         ok_files = []
+        eta = Eta(self.files)
+        t_start = time.monotonic()
+        shown = 0.0               # когда последний раз обновляли время
+        self.queue.put(("eta", L("eta_wait")))
 
         for i, src in enumerate(self.files):
             if self.stop_flag:
                 break
+            eta.start(i)
             name = os.path.basename(src)
             dst = out_path(src, self.s)
             self.say(f"  {name}", "txt")
@@ -2041,8 +2266,15 @@ class App:
                             cur, tot = float(parts[1]), float(parts[2])
                         except ValueError:
                             continue
-                        stage = (L("st_analyze") if "Analyz" in parts[0]
+                        analyzing = "Analyz" in parts[0]
+                        stage = (L("st_analyze") if analyzing
                                  else L("st_render"))
+                        # пока новая стадия разгоняется, висит прошлая оценка
+                        left = eta.left(parts[0], analyzing, cur, tot)
+                        if (left is not None
+                                and time.monotonic() - shown >= 0.5):
+                            shown = time.monotonic()
+                            self.queue.put(("eta", L("eta", t=dur(left))))
                         self.queue.put(
                             ("progress",
                              (i + (cur / tot if tot else 0)) / total))
@@ -2066,6 +2298,7 @@ class App:
                 self.say(L("done_file", name=os.path.basename(dst),
                            size=size), "ok")
                 ok_files.append(dst)
+                eta.finish()
             else:
                 self.say(L("fail_file", code=code), "bad")
                 joined = " ".join(tail)
@@ -2077,7 +2310,8 @@ class App:
                             self.say(f"     {t}", "bad")
 
         if ok_files:
-            self.say(L("done_all", ok=len(ok_files), total=total), "acc")
+            self.say(L("done_all", ok=len(ok_files), total=total,
+                       t=dur(time.monotonic() - t_start)), "acc")
             reveal(ok_files[0])
         self.queue.put(("done", None))
 
